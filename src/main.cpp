@@ -236,19 +236,6 @@ void Task_main(void *pvParameters)
         {
             Serial.println("Button Press");
             screen_index++;
-            if (screen_index % 3 == 0)
-            {
-                _ui_screen_change(ui_Screen1, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
-            }
-            else if (screen_index % 3 == 1)
-            {
-                _ui_screen_change(ui_Screen2, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
-            }
-
-            else if (screen_index % 3 == 2)
-            {
-                _ui_screen_change(ui_Screen3, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
-            }
 
             while (digitalRead(BUTTON_PIN) == 0)
             {
@@ -261,9 +248,6 @@ void Task_main(void *pvParameters)
             Serial.print("Position: ");
             Serial.println(counter);
 
-            lv_arc_set_value(ui_Arc1, (int)counter * 5);
-            lv_arc_set_value(ui_Arc2, (int)counter * 5);
-            lv_arc_set_value(ui_Arc3, (int)counter * 5);
             move_flag = 0;
         }
 
@@ -315,9 +299,6 @@ void setup()
     lv_indev_drv_register(&indev_drv);
 
     ui_init();
-    lv_arc_set_value(ui_Arc1, (int)counter);
-    lv_arc_set_value(ui_Arc2, (int)counter);
-    lv_arc_set_value(ui_Arc3, (int)counter);
 
     Serial.println("Setup done");
 
