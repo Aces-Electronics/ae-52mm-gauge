@@ -44,8 +44,13 @@ Arduino_ST7701_RGBPanel *gfx = new Arduino_ST7701_RGBPanel(
     10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
 
 int counter = 0;
+bool bezel_right = false;
+bool bezel_left = false;
 int State;
 int old_State;
+
+unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
+unsigned long debounceDelay = 400;    // the debounce time; increase if the output 
 
 int move_flag = 0;
 int button_flag = 0;
@@ -60,20 +65,24 @@ int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 
 void encoder_irq()
 {
-    State = digitalRead(ENCODER_CLK);
-    if (State != old_State)
-    {
-        if (digitalRead(ENCODER_DT) == State)
+    if ((millis() - lastDebounceTime) > debounceDelay) {
+        State = digitalRead(ENCODER_CLK);
+        if (State != old_State)
         {
-            counter++;
+            lastDebounceTime = millis(); //Reset the debouncing timer
+            if (digitalRead(ENCODER_DT) == State)
+            {
+                bezel_right = true;
+                bezel_left = false;
+            }
+            else
+            {
+                bezel_left = true;
+                bezel_right = false;
+            }
         }
-        else
-        {
-            counter--;
-        }
+        old_State = State; // the first position was changed
     }
-    old_State = State; // the first position was changed
-    move_flag = 1;
 }
 
 void pin_init()
@@ -143,16 +152,14 @@ void page_1()
 
     gfx->setTextSize(3);
     gfx->setCursor(60, 240);
-    // if (wifi_flag == 1)
-    // {
-    //     gfx->println("Wifi OK!");
-    // }
-    // else
-    // {
-    //     gfx->println("Wifi Connecting..");
-    // }
-    gfx->println("Wifi Support");
-
+    if (wifi_flag == 1)
+    {
+        gfx->println("Wifi OK!");
+    }
+    else
+    {
+        gfx->println("Wifi Connecting..");
+    }
     gfx->setTextSize(4);
     gfx->setCursor(60, 280);
     temp = "";
@@ -170,54 +177,6 @@ void page_1()
     flesh_flag = 0;
 }
 
-void test()
-{
-    while (1)
-    {
-        if (wifi_flag != 1)
-        {
-            if (WiFi.status() == WL_CONNECTED)
-            {
-                Serial.println(WiFi.localIP());
-                wifi_flag = 1;
-                flesh_flag = 1;
-            }
-        }
-
-        if (read_touch(&x, &y) == 1)
-        {
-            Serial.print("Touch ");
-            Serial.print(x);
-            Serial.print("\t");
-            Serial.println(y);
-
-            flesh_flag = 1;
-        }
-
-        if (digitalRead(BUTTON_PIN) == 0)
-        {
-
-            Serial.println("Button Press");
-            delay(100);
-            if (digitalRead(BUTTON_PIN) == 0)
-                return;
-        }
-
-        if (move_flag == 1)
-        {
-            Serial.print("Position: ");
-            Serial.println(counter);
-            move_flag = 0;
-            flesh_flag = 1;
-        }
-        if (flesh_flag == 1)
-            page_1();
-
-        delay(100);
-    }
-    return;
-}
-
 //---------------------------------------------------
 void Task_TFT(void *pvParameters)
 {
@@ -232,23 +191,57 @@ void Task_main(void *pvParameters)
 {
     while (1)
     {
-        if (digitalRead(BUTTON_PIN) == 0)
+        if ((digitalRead(BUTTON_PIN) == 0) || (bezel_left) || (bezel_right))
         {
-            Serial.println("Button Press");
-            screen_index++;
+            if (bezel_left)
+            {
+                screen_index--;
+                Serial.print("Bezel rotating: left (down)");
+            }
+            else
+            {
+                screen_index++;
+                Serial.println("Bezel rotating: right (up)");
+            }
+            
+            if (screen_index > 4)
+            {
+                screen_index = 1;
+            }
+            if (screen_index < 1)
+            {
+                screen_index = 4;
+            }
+            
+            if (screen_index == 1)
+            {
+                _ui_screen_change(ui_batteryScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+                Serial.println("Displaying: Battery Screen");
+            }
+            else if (screen_index == 2)
+            {
+                _ui_screen_change(ui_oilScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+                Serial.println("Displaying: Oil Screen");
+            }
+            else if (screen_index == 3)
+            {
+                _ui_screen_change(ui_coolantScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+                Serial.println("Displaying: Coolant Screen");
+            }
+            else if (screen_index == 4)
+            {
+                _ui_screen_change(ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+                Serial.println("Displaying: EGR/Turbo Screen");
+            }
+
+            bezel_left = false;
+            bezel_right = false;
 
             while (digitalRead(BUTTON_PIN) == 0)
             {
                 vTaskDelay(100);
             }
-        }
-
-        if (move_flag == 1)
-        {
-            Serial.print("Position: ");
-            Serial.println(counter);
-
-            move_flag = 0;
+            
         }
 
         vTaskDelay(100);
@@ -275,8 +268,6 @@ void setup()
 
     // Init Display
     gfx->begin();
-
-    test();
 
     lv_init();
     lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * screenHeight / 10);

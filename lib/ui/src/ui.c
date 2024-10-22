@@ -8,30 +8,80 @@
 
 ///////////////////// VARIABLES ////////////////////
 
-// SCREEN: ui_Screen1
-void ui_Screen1_screen_init(void);
-void ui_event_Screen1( lv_event_t * e);
-lv_obj_t *ui_Screen1;
+// SCREEN: ui_bootInitialScreen
+void ui_bootInitialScreen_screen_init(void);
+lv_obj_t *ui_bootInitialScreen;
 lv_obj_t *ui_Spinner1;
-
-// SCREEN: ui_Screen2
-void ui_Screen2_screen_init(void);
-void ui_event_Screen2( lv_event_t * e);
-lv_obj_t *ui_Screen2;
-lv_obj_t *ui_SBatt1;
-lv_obj_t *ui_SA1;
-lv_obj_t *ui_HBatt1;
-lv_obj_t *ui_HA2;
-lv_obj_t *ui_BattVLabel;
-lv_obj_t *ui_BattALabel;
-lv_obj_t *ui_VLabel;
-lv_obj_t *ui_ALabel;
-lv_obj_t *ui_BatteryLabel;
 lv_obj_t *ui_Image1;
 lv_obj_t *ui_Image2;
+lv_obj_t *ui_Image3;
+
+// SCREEN: ui_batteryScreen
+void ui_batteryScreen_screen_init(void);
+lv_obj_t *ui_batteryScreen;
+lv_obj_t *ui_SBattVArc;
+lv_obj_t *ui_SA1Arc;
+lv_obj_t *ui_HBattVArc;
+lv_obj_t *ui_HA2Arc;
+lv_obj_t *ui_battVLabelSensor;
+lv_obj_t *ui_battALabelSensor;
+lv_obj_t *ui_batteryVLabel;
+lv_obj_t *ui_batteryALabel;
+lv_obj_t *ui_startBatteryLabel;
+void ui_event_aeIconBatteryScreen( lv_event_t * e);
+lv_obj_t *ui_aeIconBatteryScreen;
+lv_obj_t *ui_batteryIcon;
+
+// SCREEN: ui_oilScreen
+void ui_oilScreen_screen_init(void);
+void ui_event_oilScreen( lv_event_t * e);
+lv_obj_t *ui_oilScreen;
+lv_obj_t *ui_oilTemp;
+lv_obj_t *ui_oilPressure;
+lv_obj_t *ui_oilTempLabelSensor;
+lv_obj_t *ui_oilPressureLabelSensor;
+lv_obj_t *ui_oilTempCLabel;
+lv_obj_t *ui_oilTempPressureLabel;
+void ui_event_aeOilIconScreen( lv_event_t * e);
+lv_obj_t *ui_aeOilIconScreen;
+lv_obj_t *ui_oilIcon;
+
+// SCREEN: ui_coolantScreen
+void ui_coolantScreen_screen_init(void);
+void ui_event_coolantScreen( lv_event_t * e);
+lv_obj_t *ui_coolantScreen;
+lv_obj_t *ui_coolantTemp;
+lv_obj_t *ui_coolantPressure;
+lv_obj_t *ui_coolantTempLabelSensor;
+lv_obj_t *ui_coolantPressureLabelSensor;
+lv_obj_t *ui_coolantTempCLabel;
+lv_obj_t *ui_coolantTempPressureLabel;
+void ui_event_coolantOilIconScreen( lv_event_t * e);
+lv_obj_t *ui_coolantOilIconScreen;
+lv_obj_t *ui_coolantIcon;
+
+// SCREEN: ui_turboExhaustScreen
+void ui_turboExhaustScreen_screen_init(void);
+void ui_event_turboExhaustScreen( lv_event_t * e);
+lv_obj_t *ui_turboExhaustScreen;
+lv_obj_t *ui_egtTemp;
+lv_obj_t *ui_turboPressure;
+lv_obj_t *ui_egtTempLabelSensor;
+lv_obj_t *ui_turboPressureLabelSensor;
+lv_obj_t *ui_egtTempCLabel;
+lv_obj_t *ui_turboTempPressureLabel;
+void ui_event_egtIconScreen( lv_event_t * e);
+lv_obj_t *ui_egtIconScreen;
+lv_obj_t *ui_turboIcon;
 lv_obj_t *ui____initial_actions0;
-const lv_img_dsc_t *ui_imgset_ae_white_[2] = {&ui_img_ae_white_128_png, &ui_img_ae_white_96_png};
+const lv_img_dsc_t *ui_imgset_ae_white_[1] = {&ui_img_ae_white_128_png};
 const lv_img_dsc_t *ui_imgset_1037587769[1] = {&ui_img_2056808699};
+const lv_img_dsc_t *ui_imgset_326682357[1] = {&ui_img_1105680357};
+const lv_img_dsc_t *ui_imgset_154589670[1] = {&ui_img_2930172};
+const lv_img_dsc_t *ui_imgset_1493273696[1] = {&ui_img_1209853138};
+const lv_img_dsc_t *ui_imgset_23834059[1] = {&ui_img_807091229};
+const lv_img_dsc_t *ui_imgset_2073783661[1] = {&ui_img_2104900491};
+const lv_img_dsc_t *ui_imgset_2029485955[1] = {&ui_img_943648365};
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
 #if LV_COLOR_DEPTH != 16
@@ -44,18 +94,49 @@ const lv_img_dsc_t *ui_imgset_1037587769[1] = {&ui_img_2056808699};
 ///////////////////// ANIMATIONS ////////////////////
 
 ///////////////////// FUNCTIONS ////////////////////
-void ui_event_Screen1( lv_event_t * e) {
+void ui_event_aeIconBatteryScreen( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+}
+}
+void ui_event_oilScreen( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_LEFT  ) {
 lv_indev_wait_release(lv_indev_get_act());
-      _ui_screen_change( ui_Screen2, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+      _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
 }
 }
-void ui_event_Screen2( lv_event_t * e) {
+void ui_event_aeOilIconScreen( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+}
+}
+void ui_event_coolantScreen( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_LEFT  ) {
 lv_indev_wait_release(lv_indev_get_act());
-      _ui_screen_change( ui_Screen1, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+      _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+}
+}
+void ui_event_coolantOilIconScreen( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+}
+}
+void ui_event_turboExhaustScreen( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_LEFT  ) {
+lv_indev_wait_release(lv_indev_get_act());
+      _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+}
+}
+void ui_event_egtIconScreen( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
 }
 }
 
@@ -66,8 +147,11 @@ void ui_init( void )
 lv_disp_t *dispp = lv_disp_get_default();
 lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), false, LV_FONT_DEFAULT);
 lv_disp_set_theme(dispp, theme);
-ui_Screen1_screen_init();
-ui_Screen2_screen_init();
+ui_bootInitialScreen_screen_init();
+ui_batteryScreen_screen_init();
+ui_oilScreen_screen_init();
+ui_coolantScreen_screen_init();
+ui_turboExhaustScreen_screen_init();
 ui____initial_actions0 = lv_obj_create(NULL);
-lv_disp_load_scr( ui_Screen1);
+lv_disp_load_scr( ui_bootInitialScreen);
 }
