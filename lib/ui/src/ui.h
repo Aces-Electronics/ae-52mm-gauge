@@ -29,7 +29,6 @@ void ui_bootInitialScreen_screen_init(void);
 extern lv_obj_t *ui_bootInitialScreen;
 extern lv_obj_t *ui_Spinner1;
 extern lv_obj_t *ui_Image1;
-extern lv_obj_t *ui_Image2;
 extern lv_obj_t *ui_Image3;
 // SCREEN: ui_batteryScreen
 void ui_batteryScreen_screen_init(void);
@@ -48,7 +47,6 @@ void ui_event_aeIconBatteryScreen1( lv_event_t * e);
 extern lv_obj_t *ui_aeIconBatteryScreen1;
 // SCREEN: ui_oilScreen
 void ui_oilScreen_screen_init(void);
-void ui_event_oilScreen( lv_event_t * e);
 extern lv_obj_t *ui_oilScreen;
 extern lv_obj_t *ui_oilTemp;
 extern lv_obj_t *ui_oilPressure;
@@ -61,7 +59,6 @@ extern lv_obj_t *ui_aeOilIconScreen;
 extern lv_obj_t *ui_oilIcon;
 // SCREEN: ui_coolantScreen
 void ui_coolantScreen_screen_init(void);
-void ui_event_coolantScreen( lv_event_t * e);
 extern lv_obj_t *ui_coolantScreen;
 extern lv_obj_t *ui_coolantTemp;
 extern lv_obj_t *ui_coolantPressure;
@@ -74,7 +71,6 @@ extern lv_obj_t *ui_coolantOilIconScreen;
 extern lv_obj_t *ui_coolantIcon;
 // SCREEN: ui_turboExhaustScreen
 void ui_turboExhaustScreen_screen_init(void);
-void ui_event_turboExhaustScreen( lv_event_t * e);
 extern lv_obj_t *ui_turboExhaustScreen;
 extern lv_obj_t *ui_egtTemp;
 extern lv_obj_t *ui_turboPressure;
@@ -82,18 +78,19 @@ extern lv_obj_t *ui_egtTempLabelSensor;
 extern lv_obj_t *ui_turboPressureLabelSensor;
 extern lv_obj_t *ui_egtTempCLabel;
 extern lv_obj_t *ui_turboTempPressureLabel;
+void ui_event_egtIconScreen( lv_event_t * e);
 extern lv_obj_t *ui_egtIconScreen;
 extern lv_obj_t *ui_turboIcon;
 extern lv_obj_t *ui____initial_actions0;
 
 LV_IMG_DECLARE( ui_img_ae_white_128_png);   // assets/ae_white_128.png
 LV_IMG_DECLARE( ui_img_807091229);   // assets/ae-wifi-96.png
-LV_IMG_DECLARE( ui_img_2104900491);   // assets/ae-wifi-off-96.png
 LV_IMG_DECLARE( ui_img_943648365);   // assets/ae-wifi-settings-96.png
 LV_IMG_DECLARE( ui_img_2056808699);   // assets/ae-gauge-battery-128.png
 LV_IMG_DECLARE( ui_img_1105680357);   // assets/ae-oil-temp-128.png
 LV_IMG_DECLARE( ui_img_2930172);   // assets/ae-coolant-128.png
 LV_IMG_DECLARE( ui_img_1209853138);   // assets/ae-turbo-128.png
+LV_IMG_DECLARE( ui_img_2104900491);   // assets/ae-wifi-off-96.png
 
 void ui_init(void);
 

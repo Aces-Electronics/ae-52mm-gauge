@@ -110,6 +110,7 @@ lv_obj_set_height( ui_egtIconScreen, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_egtIconScreen, 0 );
 lv_obj_set_y( ui_egtIconScreen, 170 );
 lv_obj_set_align( ui_egtIconScreen, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_egtIconScreen, LV_OBJ_FLAG_CLICKABLE );   /// Flags
 lv_obj_clear_flag( ui_egtIconScreen, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_img_set_zoom(ui_egtIconScreen,150);
 
@@ -123,6 +124,6 @@ lv_obj_set_align( ui_turboIcon, LV_ALIGN_CENTER );
 lv_obj_clear_flag( ui_turboIcon, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_img_set_zoom(ui_turboIcon,200);
 
-lv_obj_add_event_cb(ui_turboExhaustScreen, ui_event_turboExhaustScreen, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_egtIconScreen, ui_event_egtIconScreen, LV_EVENT_ALL, NULL);
 
 }

@@ -109,6 +109,7 @@ lv_obj_set_height( ui_aeOilIconScreen, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_aeOilIconScreen, 0 );
 lv_obj_set_y( ui_aeOilIconScreen, 170 );
 lv_obj_set_align( ui_aeOilIconScreen, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_aeOilIconScreen, LV_OBJ_FLAG_CLICKABLE );   /// Flags
 lv_obj_clear_flag( ui_aeOilIconScreen, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_img_set_zoom(ui_aeOilIconScreen,150);
 
@@ -122,6 +123,5 @@ lv_obj_set_align( ui_oilIcon, LV_ALIGN_CENTER );
 lv_obj_clear_flag( ui_oilIcon, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 
 lv_obj_add_event_cb(ui_aeOilIconScreen, ui_event_aeOilIconScreen, LV_EVENT_ALL, NULL);
-lv_obj_add_event_cb(ui_oilScreen, ui_event_oilScreen, LV_EVENT_ALL, NULL);
 
 }

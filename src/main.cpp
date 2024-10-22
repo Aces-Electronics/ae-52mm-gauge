@@ -24,7 +24,7 @@ static const uint16_t screenWidth = 480;
 static const uint16_t screenHeight = 480;
 
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[screenWidth * screenHeight / 10];
+static lv_color_t buf[screenWidth * screenHeight / 5];
 
 Arduino_ESP32RGBPanel *bus = new Arduino_ESP32RGBPanel(
     1 /* CS */, 46 /* SCK */, 0 /* SDA */,
@@ -193,6 +193,10 @@ void Task_main(void *pvParameters)
     {
         if ((digitalRead(BUTTON_PIN) == 0) || (bezel_left) || (bezel_right))
         {
+            if (!bezel_left && !bezel_right)
+            {
+                bezel_right = true;
+            }
             if (bezel_left)
             {
                 screen_index--;
@@ -215,22 +219,50 @@ void Task_main(void *pvParameters)
             
             if (screen_index == 1)
             {
-                _ui_screen_change(ui_batteryScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+                if (bezel_left)
+                {
+                    _ui_screen_change(ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
+                }
+                else
+                {
+                    _ui_screen_change(ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+                }
                 Serial.println("Displaying: Battery Screen");
             }
             else if (screen_index == 2)
             {
-                _ui_screen_change(ui_oilScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+                if (bezel_left)
+                {
+                    _ui_screen_change(ui_oilScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
+                }
+                else
+                {
+                    _ui_screen_change(ui_oilScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+                }
                 Serial.println("Displaying: Oil Screen");
             }
             else if (screen_index == 3)
             {
-                _ui_screen_change(ui_coolantScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+                if (bezel_left)
+                {
+                    _ui_screen_change(ui_coolantScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
+                }
+                else
+                {
+                    _ui_screen_change(ui_coolantScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+                }
                 Serial.println("Displaying: Coolant Screen");
             }
             else if (screen_index == 4)
             {
-                _ui_screen_change(ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+                if (bezel_left)
+                {
+                    _ui_screen_change(ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
+                }
+                else
+                {
+                    _ui_screen_change(ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+                }
                 Serial.println("Displaying: EGR/Turbo Screen");
             }
 
@@ -252,8 +284,6 @@ void setup()
 {
     Serial.begin(115200); /* prepare for possible serial debug */
 
-    delay(5000);
-
     WiFi.mode(WIFI_STA);
     // WiFi.disconnect();
     WiFi.begin(SSID, PWD);
@@ -271,7 +301,7 @@ void setup()
 
     lv_init();
 
-    lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * screenHeight / 10);
+    lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * screenHeight / 5);
 
     /*Initialize the display*/
     static lv_disp_drv_t disp_drv;
