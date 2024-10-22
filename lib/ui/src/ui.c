@@ -28,9 +28,9 @@ lv_obj_t *ui_battALabelSensor;
 lv_obj_t *ui_batteryVLabel;
 lv_obj_t *ui_batteryALabel;
 lv_obj_t *ui_startBatteryLabel;
-void ui_event_aeIconBatteryScreen( lv_event_t * e);
-lv_obj_t *ui_aeIconBatteryScreen;
 lv_obj_t *ui_batteryIcon;
+void ui_event_aeIconBatteryScreen1( lv_event_t * e);
+lv_obj_t *ui_aeIconBatteryScreen1;
 
 // SCREEN: ui_oilScreen
 void ui_oilScreen_screen_init(void);
@@ -70,7 +70,6 @@ lv_obj_t *ui_egtTempLabelSensor;
 lv_obj_t *ui_turboPressureLabelSensor;
 lv_obj_t *ui_egtTempCLabel;
 lv_obj_t *ui_turboTempPressureLabel;
-void ui_event_egtIconScreen( lv_event_t * e);
 lv_obj_t *ui_egtIconScreen;
 lv_obj_t *ui_turboIcon;
 lv_obj_t *ui____initial_actions0;
@@ -94,9 +93,10 @@ const lv_img_dsc_t *ui_imgset_2029485955[1] = {&ui_img_943648365};
 ///////////////////// ANIMATIONS ////////////////////
 
 ///////////////////// FUNCTIONS ////////////////////
-void ui_event_aeIconBatteryScreen( lv_event_t * e) {
+void ui_event_aeIconBatteryScreen1( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
-if ( event_code == LV_EVENT_CLICKED) {
+if ( event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_BOTTOM  ) {
+lv_indev_wait_release(lv_indev_get_act());
       _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
 }
 }
@@ -130,12 +130,6 @@ void ui_event_turboExhaustScreen( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_GESTURE &&  lv_indev_get_gesture_dir(lv_indev_get_act()) == LV_DIR_LEFT  ) {
 lv_indev_wait_release(lv_indev_get_act());
-      _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
-}
-}
-void ui_event_egtIconScreen( lv_event_t * e) {
-    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
-if ( event_code == LV_EVENT_CLICKED) {
       _ui_screen_change( ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
 }
 }

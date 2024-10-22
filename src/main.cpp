@@ -270,6 +270,7 @@ void setup()
     gfx->begin();
 
     lv_init();
+
     lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * screenHeight / 10);
 
     /*Initialize the display*/

@@ -18,6 +18,7 @@ ui_oilTemp = lv_arc_create(ui_oilScreen);
 lv_obj_set_width( ui_oilTemp, 430);
 lv_obj_set_height( ui_oilTemp, 430);
 lv_obj_set_align( ui_oilTemp, LV_ALIGN_CENTER );
+lv_obj_clear_flag( ui_oilTemp, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_arc_set_range(ui_oilTemp, 0,250);
 lv_arc_set_value(ui_oilTemp, 250);
 lv_arc_set_bg_angles(ui_oilTemp,135,260);
@@ -36,6 +37,7 @@ ui_oilPressure = lv_arc_create(ui_oilScreen);
 lv_obj_set_width( ui_oilPressure, 430);
 lv_obj_set_height( ui_oilPressure, 430);
 lv_obj_set_align( ui_oilPressure, LV_ALIGN_CENTER );
+lv_obj_clear_flag( ui_oilPressure, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_arc_set_value(ui_oilPressure, 55);
 lv_arc_set_bg_angles(ui_oilPressure,280,45);
 lv_arc_set_mode(ui_oilPressure, LV_ARC_MODE_REVERSE);
@@ -57,6 +59,7 @@ lv_obj_set_x( ui_oilTempLabelSensor, -40 );
 lv_obj_set_y( ui_oilTempLabelSensor, -96 );
 lv_obj_set_align( ui_oilTempLabelSensor, LV_ALIGN_CENTER );
 lv_label_set_text(ui_oilTempLabelSensor,"125");
+lv_obj_clear_flag( ui_oilTempLabelSensor, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_obj_set_style_text_color(ui_oilTempLabelSensor, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_oilTempLabelSensor, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_decor(ui_oilTempLabelSensor, LV_TEXT_DECOR_NONE, LV_PART_MAIN| LV_STATE_DEFAULT);
@@ -69,6 +72,7 @@ lv_obj_set_x( ui_oilPressureLabelSensor, -40 );
 lv_obj_set_y( ui_oilPressureLabelSensor, 80 );
 lv_obj_set_align( ui_oilPressureLabelSensor, LV_ALIGN_CENTER );
 lv_label_set_text(ui_oilPressureLabelSensor,"55");
+lv_obj_clear_flag( ui_oilPressureLabelSensor, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_obj_set_style_text_color(ui_oilPressureLabelSensor, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_oilPressureLabelSensor, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_decor(ui_oilPressureLabelSensor, LV_TEXT_DECOR_NONE, LV_PART_MAIN| LV_STATE_DEFAULT);
@@ -81,6 +85,7 @@ lv_obj_set_x( ui_oilTempCLabel, 20 );
 lv_obj_set_y( ui_oilTempCLabel, -96 );
 lv_obj_set_align( ui_oilTempCLabel, LV_ALIGN_CENTER );
 lv_label_set_text(ui_oilTempCLabel,"C");
+lv_obj_clear_flag( ui_oilTempCLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_obj_set_style_text_color(ui_oilTempCLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_oilTempCLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_oilTempCLabel, &lv_font_montserrat_48, LV_PART_MAIN| LV_STATE_DEFAULT);
@@ -92,6 +97,7 @@ lv_obj_set_x( ui_oilTempPressureLabel, 45 );
 lv_obj_set_y( ui_oilTempPressureLabel, 84 );
 lv_obj_set_align( ui_oilTempPressureLabel, LV_ALIGN_CENTER );
 lv_label_set_text(ui_oilTempPressureLabel,"PSI");
+lv_obj_clear_flag( ui_oilTempPressureLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_obj_set_style_text_color(ui_oilTempPressureLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_oilTempPressureLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_oilTempPressureLabel, &lv_font_montserrat_48, LV_PART_MAIN| LV_STATE_DEFAULT);
@@ -103,8 +109,7 @@ lv_obj_set_height( ui_aeOilIconScreen, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_aeOilIconScreen, 0 );
 lv_obj_set_y( ui_aeOilIconScreen, 170 );
 lv_obj_set_align( ui_aeOilIconScreen, LV_ALIGN_CENTER );
-lv_obj_add_flag( ui_aeOilIconScreen, LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
-lv_obj_clear_flag( ui_aeOilIconScreen, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_clear_flag( ui_aeOilIconScreen, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_img_set_zoom(ui_aeOilIconScreen,150);
 
 ui_oilIcon = lv_img_create(ui_oilScreen);
@@ -114,8 +119,7 @@ lv_obj_set_height( ui_oilIcon, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_oilIcon, 0 );
 lv_obj_set_y( ui_oilIcon, -10 );
 lv_obj_set_align( ui_oilIcon, LV_ALIGN_CENTER );
-lv_obj_add_flag( ui_oilIcon, LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
-lv_obj_clear_flag( ui_oilIcon, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_clear_flag( ui_oilIcon, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 
 lv_obj_add_event_cb(ui_aeOilIconScreen, ui_event_aeOilIconScreen, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_oilScreen, ui_event_oilScreen, LV_EVENT_ALL, NULL);
