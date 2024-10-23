@@ -5,6 +5,7 @@ SET(SOURCES screens/ui_bootInitialScreen.c
     screens/ui_turboExhaustScreen.c
     ui.c
     ui_helpers.c
+    ui_events.cpp
     images/ui_img_ae_white_128_png.c
     images/ui_img_807091229.c
     images/ui_img_943648365.c

@@ -12,6 +12,7 @@
 void ui_bootInitialScreen_screen_init(void);
 lv_obj_t *ui_bootInitialScreen;
 lv_obj_t *ui_Spinner1;
+void ui_event_Image1( lv_event_t * e);
 lv_obj_t *ui_Image1;
 lv_obj_t *ui_Image3;
 
@@ -90,6 +91,12 @@ const lv_img_dsc_t *ui_imgset_2029485955[1] = {&ui_img_943648365};
 ///////////////////// ANIMATIONS ////////////////////
 
 ///////////////////// FUNCTIONS ////////////////////
+void ui_event_Image1( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_PRESSED) {
+      toggleWiFI( e );
+}
+}
 void ui_event_aeIconBatteryScreen1( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_PRESSED) {

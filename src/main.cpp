@@ -63,6 +63,11 @@ int x = 0, y = 0;
 #define COLOR_NUM 5
 int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 
+void toggleWiFI(lv_event_t * e);
+{
+    
+}
+
 void encoder_irq()
 {
     if ((millis() - lastDebounceTime) > debounceDelay) {

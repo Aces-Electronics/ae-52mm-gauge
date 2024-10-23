@@ -28,6 +28,7 @@ extern "C" {
 void ui_bootInitialScreen_screen_init(void);
 extern lv_obj_t *ui_bootInitialScreen;
 extern lv_obj_t *ui_Spinner1;
+void ui_event_Image1( lv_event_t * e);
 extern lv_obj_t *ui_Image1;
 extern lv_obj_t *ui_Image3;
 // SCREEN: ui_batteryScreen
