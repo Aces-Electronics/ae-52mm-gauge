@@ -31,6 +31,7 @@ extern lv_obj_t *ui_Spinner1;
 void ui_event_wifiIcon( lv_event_t * e);
 extern lv_obj_t *ui_wifiIcon;
 extern lv_obj_t *ui_settingsIcon;
+extern lv_obj_t *ui_feedbackLabel;
 // SCREEN: ui_batteryScreen
 void ui_batteryScreen_screen_init(void);
 extern lv_obj_t *ui_batteryScreen;

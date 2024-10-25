@@ -10,12 +10,16 @@ bool wifiOffState = true;
 void toggleWiFi(lv_event_t * e)
 {
 	wifiOffState = !wifiOffState;
-	if (wifiOffState)
+	if (!wifiOffState)
 	{
-		lv_img_set_src(ui_wifiIcon, &ui_img_2104900491);
+		lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
+		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Off!");
+		lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
 	}
 	else
 	{
-		lv_img_set_src(ui_wifiIcon, &ui_img_807091229);
+		lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
+		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Connecting...");
+		lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
 	}
 }
