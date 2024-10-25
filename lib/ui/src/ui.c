@@ -12,9 +12,9 @@
 void ui_bootInitialScreen_screen_init(void);
 lv_obj_t *ui_bootInitialScreen;
 lv_obj_t *ui_Spinner1;
-void ui_event_Image1( lv_event_t * e);
-lv_obj_t *ui_Image1;
-lv_obj_t *ui_Image3;
+void ui_event_wifiIcon( lv_event_t * e);
+lv_obj_t *ui_wifiIcon;
+lv_obj_t *ui_settingsIcon;
 
 // SCREEN: ui_batteryScreen
 void ui_batteryScreen_screen_init(void);
@@ -79,6 +79,7 @@ const lv_img_dsc_t *ui_imgset_1493273696[1] = {&ui_img_1209853138};
 const lv_img_dsc_t *ui_imgset_23834059[1] = {&ui_img_807091229};
 const lv_img_dsc_t *ui_imgset_2073783661[1] = {&ui_img_2104900491};
 const lv_img_dsc_t *ui_imgset_2029485955[1] = {&ui_img_943648365};
+const lv_img_dsc_t *ui_imgset_1899260417[1] = {&ui_img_501072417};
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
 #if LV_COLOR_DEPTH != 16
@@ -91,10 +92,10 @@ const lv_img_dsc_t *ui_imgset_2029485955[1] = {&ui_img_943648365};
 ///////////////////// ANIMATIONS ////////////////////
 
 ///////////////////// FUNCTIONS ////////////////////
-void ui_event_Image1( lv_event_t * e) {
+void ui_event_wifiIcon( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_PRESSED) {
-      toggleWiFI( e );
+      toggleWiFi( e );
 }
 }
 void ui_event_aeIconBatteryScreen1( lv_event_t * e) {

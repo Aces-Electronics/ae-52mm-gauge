@@ -63,9 +63,9 @@ int x = 0, y = 0;
 #define COLOR_NUM 5
 int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 
-void toggleWiFI(lv_event_t * e);
+void toggleWiFI(lv_event_t * e)
 {
-    
+    Serial.print("toggling...");
 }
 
 void encoder_irq()

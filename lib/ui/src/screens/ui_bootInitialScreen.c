@@ -22,25 +22,25 @@ lv_obj_clear_flag( ui_Spinner1, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBB
 lv_obj_set_style_arc_color(ui_Spinner1, lv_color_hex(0x000000), LV_PART_INDICATOR | LV_STATE_DEFAULT );
 lv_obj_set_style_arc_opa(ui_Spinner1, 255, LV_PART_INDICATOR| LV_STATE_DEFAULT);
 
-ui_Image1 = lv_img_create(ui_bootInitialScreen);
-lv_img_set_src(ui_Image1, &ui_img_807091229);
-lv_obj_set_width( ui_Image1, LV_SIZE_CONTENT);  /// 1
-lv_obj_set_height( ui_Image1, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_Image1, -126 );
-lv_obj_set_y( ui_Image1, 0 );
-lv_obj_set_align( ui_Image1, LV_ALIGN_CENTER );
-lv_obj_add_flag( ui_Image1, LV_OBJ_FLAG_CLICKABLE );   /// Flags
-lv_obj_clear_flag( ui_Image1, LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+ui_wifiIcon = lv_img_create(ui_bootInitialScreen);
+lv_img_set_src(ui_wifiIcon, &ui_img_807091229);
+lv_obj_set_width( ui_wifiIcon, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_wifiIcon, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_wifiIcon, -126 );
+lv_obj_set_y( ui_wifiIcon, -4 );
+lv_obj_set_align( ui_wifiIcon, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_wifiIcon, LV_OBJ_FLAG_CLICKABLE );   /// Flags
+lv_obj_clear_flag( ui_wifiIcon, LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 
-ui_Image3 = lv_img_create(ui_bootInitialScreen);
-lv_img_set_src(ui_Image3, &ui_img_943648365);
-lv_obj_set_width( ui_Image3, LV_SIZE_CONTENT);  /// 1
-lv_obj_set_height( ui_Image3, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_Image3, 126 );
-lv_obj_set_y( ui_Image3, -4 );
-lv_obj_set_align( ui_Image3, LV_ALIGN_CENTER );
-lv_obj_clear_flag( ui_Image3, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+ui_settingsIcon = lv_img_create(ui_bootInitialScreen);
+lv_img_set_src(ui_settingsIcon, &ui_img_501072417);
+lv_obj_set_width( ui_settingsIcon, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_settingsIcon, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_settingsIcon, 126 );
+lv_obj_set_y( ui_settingsIcon, -4 );
+lv_obj_set_align( ui_settingsIcon, LV_ALIGN_CENTER );
+lv_obj_clear_flag( ui_settingsIcon, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 
-lv_obj_add_event_cb(ui_Image1, ui_event_Image1, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_wifiIcon, ui_event_wifiIcon, LV_EVENT_ALL, NULL);
 
 }

@@ -5,7 +5,17 @@
 
 #include "ui.h"
 
-void toggleWiFI(lv_event_t * e)
+bool wifiOffState = true;
+
+void toggleWiFi(lv_event_t * e)
 {
-	// Your code here
+	wifiOffState = !wifiOffState;
+	if (wifiOffState)
+	{
+		lv_img_set_src(ui_wifiIcon, &ui_img_2104900491);
+	}
+	else
+	{
+		lv_img_set_src(ui_wifiIcon, &ui_img_807091229);
+	}
 }
