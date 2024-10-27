@@ -35,7 +35,7 @@ void toggleWiFi(lv_event_t * e)
 		lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);		
 		scan_WiFi();
 		//ToDo: on clear/accept/back unhide evrything
 	}
