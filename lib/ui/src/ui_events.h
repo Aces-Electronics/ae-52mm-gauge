@@ -11,6 +11,8 @@ extern "C" {
 #endif
 
 void toggleWiFi(lv_event_t * e);
+void settingsButtonPressedFunction(lv_event_t * e);
+void landingBackButtonPressedFunction(lv_event_t * e);
 
 #ifdef __cplusplus
 } /*extern "C"*/

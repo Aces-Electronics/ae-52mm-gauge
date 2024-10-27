@@ -11,7 +11,6 @@ ui_bootInitialScreen = lv_obj_create(NULL);
 lv_obj_clear_flag( ui_bootInitialScreen, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM );    /// Flags
 lv_obj_set_style_bg_color(ui_bootInitialScreen, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_bootInitialScreen, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_bg_img_src( ui_bootInitialScreen, &ui_img_ae_white_128_png, LV_PART_MAIN | LV_STATE_DEFAULT );
 
 ui_Spinner1 = lv_spinner_create(ui_bootInitialScreen,1000,90);
 lv_obj_set_width( ui_Spinner1, 400);
@@ -39,7 +38,8 @@ lv_obj_set_height( ui_settingsIcon, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_settingsIcon, 126 );
 lv_obj_set_y( ui_settingsIcon, -4 );
 lv_obj_set_align( ui_settingsIcon, LV_ALIGN_CENTER );
-lv_obj_clear_flag( ui_settingsIcon, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+lv_obj_add_flag( ui_settingsIcon, LV_OBJ_FLAG_CLICKABLE );   /// Flags
+lv_obj_clear_flag( ui_settingsIcon, LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 
 ui_feedbackLabel = lv_label_create(ui_bootInitialScreen);
 lv_obj_set_width( ui_feedbackLabel, LV_SIZE_CONTENT);  /// 1
@@ -50,8 +50,39 @@ lv_obj_set_align( ui_feedbackLabel, LV_ALIGN_CENTER );
 lv_label_set_text(ui_feedbackLabel,"WiFi Connecting...");
 lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_feedbackLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_align(ui_feedbackLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_feedbackLabel, &lv_font_montserrat_28, LV_PART_MAIN| LV_STATE_DEFAULT);
 
+ui_aeLandingIcon = lv_img_create(ui_bootInitialScreen);
+lv_img_set_src(ui_aeLandingIcon, &ui_img_ae_white_128_png);
+lv_obj_set_width( ui_aeLandingIcon, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_aeLandingIcon, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_aeLandingIcon, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_aeLandingIcon, LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
+lv_obj_clear_flag( ui_aeLandingIcon, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+
+ui_landingBackButton = lv_label_create(ui_bootInitialScreen);
+lv_obj_set_width( ui_landingBackButton, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_landingBackButton, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_landingBackButton, 0 );
+lv_obj_set_y( ui_landingBackButton, 135 );
+lv_obj_set_align( ui_landingBackButton, LV_ALIGN_CENTER );
+lv_label_set_text(ui_landingBackButton,"Back");
+lv_obj_add_flag( ui_landingBackButton, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_CLICKABLE );   /// Flags
+lv_obj_clear_flag( ui_landingBackButton, LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+lv_obj_set_style_text_color(ui_landingBackButton, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_landingBackButton, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_landingBackButton, &lv_font_montserrat_28, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_radius(ui_landingBackButton, 5, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_bg_color(ui_landingBackButton, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_landingBackButton, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_left(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_right(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_top(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_bottom(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
+
 lv_obj_add_event_cb(ui_wifiIcon, ui_event_wifiIcon, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_settingsIcon, ui_event_settingsIcon, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_landingBackButton, ui_event_landingBackButton, LV_EVENT_ALL, NULL);
 
 }

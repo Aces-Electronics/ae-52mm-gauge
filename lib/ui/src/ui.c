@@ -14,8 +14,12 @@ lv_obj_t *ui_bootInitialScreen;
 lv_obj_t *ui_Spinner1;
 void ui_event_wifiIcon( lv_event_t * e);
 lv_obj_t *ui_wifiIcon;
+void ui_event_settingsIcon( lv_event_t * e);
 lv_obj_t *ui_settingsIcon;
 lv_obj_t *ui_feedbackLabel;
+lv_obj_t *ui_aeLandingIcon;
+void ui_event_landingBackButton( lv_event_t * e);
+lv_obj_t *ui_landingBackButton;
 
 // SCREEN: ui_batteryScreen
 void ui_batteryScreen_screen_init(void);
@@ -97,6 +101,18 @@ void ui_event_wifiIcon( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_PRESSED) {
       toggleWiFi( e );
+}
+}
+void ui_event_settingsIcon( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_PRESSED) {
+      settingsButtonPressedFunction( e );
+}
+}
+void ui_event_landingBackButton( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_PRESSED) {
+      landingBackButtonPressedFunction( e );
 }
 }
 void ui_event_aeIconBatteryScreen1( lv_event_t * e) {

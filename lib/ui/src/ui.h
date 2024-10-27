@@ -30,8 +30,12 @@ extern lv_obj_t *ui_bootInitialScreen;
 extern lv_obj_t *ui_Spinner1;
 void ui_event_wifiIcon( lv_event_t * e);
 extern lv_obj_t *ui_wifiIcon;
+void ui_event_settingsIcon( lv_event_t * e);
 extern lv_obj_t *ui_settingsIcon;
 extern lv_obj_t *ui_feedbackLabel;
+extern lv_obj_t *ui_aeLandingIcon;
+void ui_event_landingBackButton( lv_event_t * e);
+extern lv_obj_t *ui_landingBackButton;
 // SCREEN: ui_batteryScreen
 void ui_batteryScreen_screen_init(void);
 extern lv_obj_t *ui_batteryScreen;
