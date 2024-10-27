@@ -10,19 +10,27 @@ bool settingsState = false;
 
 void toggleWiFi(lv_event_t * e)
 {
-	wifiOffState = !wifiOffState;
-	if (!wifiOffState)
+	if (!settingsState)
 	{
-		lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
-		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Off!");
-		lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+		wifiOffState = !wifiOffState;
+		if (!wifiOffState)
+		{
+			lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
+			_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Off!");
+			lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+		}
+		else
+		{
+			lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
+			_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Connecting...");
+			lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+		}
 	}
 	else
 	{
-		lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
-		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Connecting...");
-		lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+		//ToDo: launch the wifi network selector
 	}
+	
 }
 
 void settingsButtonPressedFunction(lv_event_t * e)
@@ -31,7 +39,8 @@ void settingsButtonPressedFunction(lv_event_t * e)
 	if (settingsState)
 	{
 		lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+		//lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_img_set_src(ui_wifiIcon, &ui_img_943648365); // WiFi off
 		lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
 		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "Settings");
@@ -42,7 +51,6 @@ void settingsButtonPressedFunction(lv_event_t * e)
 
 void landingBackButtonPressedFunction(lv_event_t * e)
 {
-	lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_clear_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
@@ -55,6 +63,8 @@ void landingBackButtonPressedFunction(lv_event_t * e)
 	else
 	{
 		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Connecting...");
+		lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+
 	}
 	settingsState = !settingsState;
 }

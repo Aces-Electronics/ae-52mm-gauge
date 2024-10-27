@@ -13,8 +13,8 @@ lv_obj_set_style_bg_color(ui_bootInitialScreen, lv_color_hex(0x000000), LV_PART_
 lv_obj_set_style_bg_opa(ui_bootInitialScreen, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_Spinner1 = lv_spinner_create(ui_bootInitialScreen,1000,90);
-lv_obj_set_width( ui_Spinner1, 400);
-lv_obj_set_height( ui_Spinner1, 400);
+lv_obj_set_width( ui_Spinner1, 450);
+lv_obj_set_height( ui_Spinner1, 450);
 lv_obj_set_align( ui_Spinner1, LV_ALIGN_CENTER );
 lv_obj_clear_flag( ui_Spinner1, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 
@@ -25,7 +25,7 @@ ui_wifiIcon = lv_img_create(ui_bootInitialScreen);
 lv_img_set_src(ui_wifiIcon, &ui_img_807091229);
 lv_obj_set_width( ui_wifiIcon, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_wifiIcon, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_wifiIcon, -126 );
+lv_obj_set_x( ui_wifiIcon, -135 );
 lv_obj_set_y( ui_wifiIcon, -4 );
 lv_obj_set_align( ui_wifiIcon, LV_ALIGN_CENTER );
 lv_obj_add_flag( ui_wifiIcon, LV_OBJ_FLAG_CLICKABLE );   /// Flags
@@ -35,7 +35,7 @@ ui_settingsIcon = lv_img_create(ui_bootInitialScreen);
 lv_img_set_src(ui_settingsIcon, &ui_img_501072417);
 lv_obj_set_width( ui_settingsIcon, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_settingsIcon, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_settingsIcon, 126 );
+lv_obj_set_x( ui_settingsIcon, 136 );
 lv_obj_set_y( ui_settingsIcon, -4 );
 lv_obj_set_align( ui_settingsIcon, LV_ALIGN_CENTER );
 lv_obj_add_flag( ui_settingsIcon, LV_OBJ_FLAG_CLICKABLE );   /// Flags
