@@ -48,6 +48,7 @@ bool bezel_left = false;
 bool connectWiFi = false;
 bool disableWiFi = false;
 bool checkIP = false;
+bool wifiOffState = true;
 
 int counter = 0;
 int State;
@@ -58,6 +59,7 @@ int flesh_flag = 1;
 int screen_index = 0;
 int wifi_flag = 0;
 int x = 0, y = 0;
+int loopCounter = 0;
 
 char feedbackLabelString[] = "WIFI: UNKNOWN STATE";
 
@@ -189,25 +191,43 @@ void page_1()
 //---------------------------------------------------
 
 
-void updateWiFiState ()
+void updateWiFiState()
 {
   int connectionStatus = WiFi.status();
   if(connectionStatus == WL_CONNECTED)
-    lv_label_set_text(ui_feedbackLabel,"WL_CONNECTED");
+  {
+    lv_label_set_text(ui_feedbackLabel,"WiFi: CONNECTED");
+  }
   else if(connectionStatus == WL_IDLE_STATUS)
-    lv_label_set_text(ui_feedbackLabel,"WL_IDLE_STATUS");
+  {
+    lv_label_set_text(ui_feedbackLabel,"WiFi: IDLE");
+  }
   else if(connectionStatus == WL_CONNECT_FAILED)
-    lv_label_set_text(ui_feedbackLabel,"WL_CONNECT_FAILED");
+  {
+    lv_label_set_text(ui_feedbackLabel,"WiFi: ERROR");
+  }
   else if(connectionStatus == WL_NO_SSID_AVAIL)
-    lv_label_set_text(ui_feedbackLabel,"WL_NO_SSID_AVAIL");
+  {
+    lv_label_set_text(ui_feedbackLabel,"WiFi: UNAVAILABLE");
+  }
   else if(connectionStatus == WL_SCAN_COMPLETED)
-    lv_label_set_text(ui_feedbackLabel,"WL_SCAN_COMPLETED");
+  {
+    lv_label_set_text(ui_feedbackLabel,"WiFi: SCANNING");
+  }
   else if(connectionStatus == WL_CONNECTION_LOST)
-    lv_label_set_text(ui_feedbackLabel,"WL_CONNECTION_LOST");
+  {
+    lv_label_set_text(ui_feedbackLabel,"WiFi: DISCONNECTED");
+  }
   else if(connectionStatus == WL_DISCONNECTED)
-    lv_label_set_text(ui_feedbackLabel,"WL_DISCONNECTED");
+  {
+    lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
+    lv_label_set_text(ui_feedbackLabel,"WiFi: UNCONFIGURED"); //ToDo: might need to check if SSID is "none"
+    wifiOffState = false;
+  }
   else
-    lv_label_set_text(ui_feedbackLabel,"WiFi_UNKNOWN");
+  {
+    lv_label_set_text(ui_feedbackLabel,"WiFi: UNKNOWN");
+  }
 }
 
 void Task_TFT(void *pvParameters)
@@ -327,6 +347,13 @@ void Task_main(void *pvParameters)
           {
             // ToDo: do something about showing that WiFi is not connected
           }
+        }
+
+        loopCounter++;
+        if (loopCounter > 500)
+        {
+          updateWiFiState();
+          loopCounter = 0;
         }
 
         vTaskDelay(100);

@@ -6,9 +6,7 @@
 #include "ui.h"
 #include "Arduino.h"
 
-//extern void scan_WiFi();
-
-bool wifiOffState = true;
+extern bool wifiOffState;
 bool settingsState = false;
 bool wifiSettingsState = false;
 

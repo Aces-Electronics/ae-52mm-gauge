@@ -10,15 +10,14 @@ extern char PWD[];
 
 void ui_bootInitialScreen_screen_init(void)
 {
-//updateWiFiState();
 ui_bootInitialScreen = lv_obj_create(NULL);
 lv_obj_clear_flag( ui_bootInitialScreen, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM );    /// Flags
 lv_obj_set_style_bg_color(ui_bootInitialScreen, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_bootInitialScreen, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_Spinner1 = lv_spinner_create(ui_bootInitialScreen,1000,90);
-lv_obj_set_width( ui_Spinner1, 450);
-lv_obj_set_height( ui_Spinner1, 450);
+lv_obj_set_width( ui_Spinner1, 480);
+lv_obj_set_height( ui_Spinner1, 480);
 lv_obj_set_align( ui_Spinner1, LV_ALIGN_CENTER );
 lv_obj_clear_flag( ui_Spinner1, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 
@@ -48,8 +47,8 @@ lv_obj_clear_flag( ui_settingsIcon, LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GE
 ui_feedbackLabel = lv_label_create(ui_bootInitialScreen);
 lv_obj_set_width( ui_feedbackLabel, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_feedbackLabel, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_feedbackLabel, 7 );
-lv_obj_set_y( ui_feedbackLabel, -165 );
+lv_obj_set_x( ui_feedbackLabel, 0 );
+lv_obj_set_y( ui_feedbackLabel, -125 );
 lv_obj_set_align( ui_feedbackLabel, LV_ALIGN_CENTER );
 lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_feedbackLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
