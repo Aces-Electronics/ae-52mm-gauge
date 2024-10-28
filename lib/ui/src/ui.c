@@ -5,6 +5,16 @@
 
 #include "ui.h"
 #include "ui_helpers.h"
+#include <string.h>
+
+
+extern char SSID[];
+extern char PWD[];
+
+char test[] = "test";
+
+extern bool connectWiFi;
+extern bool disableWiFi;
 
 ///////////////////// VARIABLES ////////////////////
 
@@ -18,6 +28,14 @@ void ui_event_settingsIcon( lv_event_t * e);
 lv_obj_t *ui_settingsIcon;
 lv_obj_t *ui_feedbackLabel;
 lv_obj_t *ui_aeLandingIcon;
+lv_obj_t *ui_SSIDLabel;
+void ui_event_SSIDInputText( lv_event_t * e);
+lv_obj_t *ui_SSIDInputText;
+lv_obj_t *ui_SSIDPasswordLabel;
+void ui_event_SSIDPasswordInputText( lv_event_t * e);
+lv_obj_t *ui_SSIDPasswordInputText;
+void ui_event_Keyboard( lv_event_t * e);
+lv_obj_t *ui_Keyboard;
 void ui_event_landingBackButton( lv_event_t * e);
 lv_obj_t *ui_landingBackButton;
 
@@ -76,15 +94,20 @@ void ui_event_egtIconScreen( lv_event_t * e);
 lv_obj_t *ui_egtIconScreen;
 lv_obj_t *ui_turboIcon;
 lv_obj_t *ui____initial_actions0;
-const lv_img_dsc_t *ui_imgset_ae_white_[1] = {&ui_img_ae_white_128_png};
+const lv_img_dsc_t *ui_imgset_1899260417[1] = {&ui_img_501072417};
+const lv_img_dsc_t *ui_imgset_154589670[1] = {&ui_img_2930172};
 const lv_img_dsc_t *ui_imgset_1037587769[1] = {&ui_img_2056808699};
 const lv_img_dsc_t *ui_imgset_326682357[1] = {&ui_img_1105680357};
-const lv_img_dsc_t *ui_imgset_154589670[1] = {&ui_img_2930172};
 const lv_img_dsc_t *ui_imgset_1493273696[1] = {&ui_img_1209853138};
 const lv_img_dsc_t *ui_imgset_23834059[1] = {&ui_img_807091229};
 const lv_img_dsc_t *ui_imgset_2073783661[1] = {&ui_img_2104900491};
 const lv_img_dsc_t *ui_imgset_2029485955[1] = {&ui_img_943648365};
-const lv_img_dsc_t *ui_imgset_1899260417[1] = {&ui_img_501072417};
+const lv_img_dsc_t *ui_imgset_ae_white_[1] = {&ui_img_ae_white_128_png};
+
+bool SSIDField = false;
+bool SSIDPasswordField = false;
+bool SSIDUpdated = false;
+bool SSIDPasswordUpdated = false;
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
 #if LV_COLOR_DEPTH != 16
@@ -108,6 +131,65 @@ void ui_event_settingsIcon( lv_event_t * e) {
 if ( event_code == LV_EVENT_PRESSED) {
       settingsButtonPressedFunction( e );
 }
+}
+void ui_event_SSIDInputText( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+    if ( event_code == LV_EVENT_PRESSED) {
+
+        if (strncmp(SSID, "none", 4)==0)
+        {
+            //lv_textarea_set_placeholder_text(ui_SSIDInputText, SSID);
+            lv_textarea_set_placeholder_text(ui_SSIDInputText,"turdsting");
+        }  
+        SSIDField = true;
+        _ui_keyboard_set_target(ui_Keyboard,  ui_SSIDInputText);
+        _ui_flag_modify( ui_Keyboard, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_REMOVE);
+    }
+}
+void ui_event_SSIDPasswordInputText( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+    if ( event_code == LV_EVENT_PRESSED) 
+    {
+        if (strncmp(PWD, "none", 4)==0)
+        {
+            lv_textarea_set_placeholder_text(ui_SSIDPasswordInputText, PWD);
+        }  
+        SSIDPasswordField = true;
+        _ui_keyboard_set_target(ui_Keyboard,  ui_SSIDPasswordInputText);
+        _ui_flag_modify( ui_Keyboard, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_REMOVE);
+    }
+}
+void ui_event_Keyboard( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+    if ( event_code == LV_EVENT_READY) 
+    {
+        _ui_flag_modify( ui_Keyboard, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_ADD);
+
+        if (SSIDField)
+        {
+            LV_LOG_USER("Saving SSID...");
+            strcpy(SSID, lv_textarea_get_text(ui_SSIDInputText)); //ToDo: store these in flash
+            SSIDField = false;
+            SSIDUpdated = true;
+        }
+        else if (SSIDPasswordField)
+        {
+            LV_LOG_USER("Saving Password...");
+            strcpy(PWD, lv_textarea_get_text(ui_SSIDPasswordInputText)); //ToDo: store these in flash
+            SSIDPasswordField = false;
+            SSIDPasswordUpdated = true;
+        }
+        
+        if (SSIDUpdated && SSIDPasswordUpdated)
+        {
+            connectWiFi = true;
+        } 
+    }
+    if ( event_code == LV_EVENT_CANCEL) {
+        _ui_flag_modify( ui_Keyboard, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_ADD);
+        SSIDPasswordField = false;
+        SSIDField = false;
+    }
 }
 void ui_event_landingBackButton( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);

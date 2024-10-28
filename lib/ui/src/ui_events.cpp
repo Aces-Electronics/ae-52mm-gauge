@@ -4,17 +4,18 @@
 // Project name: ae_52mm_gauge
 
 #include "ui.h"
+#include "Arduino.h"
 
-extern void scan_WiFi();
+//extern void scan_WiFi();
 
 bool wifiOffState = true;
 bool settingsState = false;
+bool wifiSettingsState = false;
 
 void toggleWiFi(lv_event_t * e)
 {
 	if (!settingsState)
 	{
-		wifiOffState = !wifiOffState;
 		if (!wifiOffState)
 		{
 			lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
@@ -30,16 +31,25 @@ void toggleWiFi(lv_event_t * e)
 	}
 	else
 	{
-		LV_LOG_USER("Scanning for WiFi networks...");
-		lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);		
-		scan_WiFi();
-		//ToDo: on clear/accept/back unhide evrything
+		if (!wifiSettingsState)
+		{
+			lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+
+			lv_obj_clear_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_clear_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_clear_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_clear_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
+			//lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);	
+		}
+		else
+		{
+			wifiSettingsState = true;
+		}
 	}
-	
+	wifiOffState = !wifiOffState;
 }
 
 void settingsButtonPressedFunction(lv_event_t * e)
@@ -52,7 +62,7 @@ void settingsButtonPressedFunction(lv_event_t * e)
 		lv_img_set_src(ui_wifiIcon, &ui_img_943648365); // WiFi off
 		lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
-		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "Settings");
+		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "SETTINGS: ");
 		lv_obj_clear_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
 	}
 	

@@ -25,6 +25,7 @@ extern "C" {
 #include "ui_helpers.h"
 #include "ui_events.h"
 // SCREEN: ui_bootInitialScreen
+void updateWiFiState();
 void ui_bootInitialScreen_screen_init(void);
 extern lv_obj_t *ui_bootInitialScreen;
 extern lv_obj_t *ui_Spinner1;
@@ -34,6 +35,14 @@ void ui_event_settingsIcon( lv_event_t * e);
 extern lv_obj_t *ui_settingsIcon;
 extern lv_obj_t *ui_feedbackLabel;
 extern lv_obj_t *ui_aeLandingIcon;
+extern lv_obj_t *ui_SSIDLabel;
+void ui_event_SSIDInputText( lv_event_t * e);
+extern lv_obj_t *ui_SSIDInputText;
+extern lv_obj_t *ui_SSIDPasswordLabel;
+void ui_event_SSIDPasswordInputText( lv_event_t * e);
+extern lv_obj_t *ui_SSIDPasswordInputText;
+void ui_event_Keyboard( lv_event_t * e);
+extern lv_obj_t *ui_Keyboard;
 void ui_event_landingBackButton( lv_event_t * e);
 extern lv_obj_t *ui_landingBackButton;
 // SCREEN: ui_batteryScreen
@@ -89,9 +98,9 @@ extern lv_obj_t *ui_egtIconScreen;
 extern lv_obj_t *ui_turboIcon;
 extern lv_obj_t *ui____initial_actions0;
 
-LV_IMG_DECLARE( ui_img_ae_white_128_png);   // assets/ae_white_128.png
 LV_IMG_DECLARE( ui_img_807091229);   // assets/ae-wifi-96.png
 LV_IMG_DECLARE( ui_img_501072417);   // assets/ae-cog-96.png
+LV_IMG_DECLARE( ui_img_ae_white_128_png);   // assets/ae_white_128.png
 LV_IMG_DECLARE( ui_img_2056808699);   // assets/ae-gauge-battery-128.png
 LV_IMG_DECLARE( ui_img_1105680357);   // assets/ae-oil-temp-128.png
 LV_IMG_DECLARE( ui_img_2930172);   // assets/ae-coolant-128.png

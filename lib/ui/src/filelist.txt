@@ -5,9 +5,9 @@ screens/ui_coolantScreen.c
 screens/ui_turboExhaustScreen.c
 ui.c
 ui_helpers.c
-images/ui_img_ae_white_128_png.c
 images/ui_img_807091229.c
 images/ui_img_501072417.c
+images/ui_img_ae_white_128_png.c
 images/ui_img_2056808699.c
 images/ui_img_1105680357.c
 images/ui_img_2930172.c

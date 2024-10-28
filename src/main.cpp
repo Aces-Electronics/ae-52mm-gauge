@@ -43,22 +43,26 @@ Arduino_ST7701_RGBPanel *gfx = new Arduino_ST7701_RGBPanel(
     10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
     10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
 
-int counter = 0;
 bool bezel_right = false;
 bool bezel_left = false;
+bool connectWiFi = false;
+bool disableWiFi = false;
+bool checkIP = false;
+
+int counter = 0;
 int State;
 int old_State;
-
-unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
-unsigned long debounceDelay = 400;    // the debounce time; increase if the output 
-
 int move_flag = 0;
 int button_flag = 0;
 int flesh_flag = 1;
 int screen_index = 0;
 int wifi_flag = 0;
-
 int x = 0, y = 0;
+
+char feedbackLabelString[] = "WIFI: UNKNOWN STATE";
+
+unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
+unsigned long debounceDelay = 400;    // the debounce time; increase if the output 
 
 #define COLOR_NUM 5
 int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
@@ -183,6 +187,29 @@ void page_1()
 }
 
 //---------------------------------------------------
+
+
+void updateWiFiState ()
+{
+  int connectionStatus = WiFi.status();
+  if(connectionStatus == WL_CONNECTED)
+    lv_label_set_text(ui_feedbackLabel,"WL_CONNECTED");
+  else if(connectionStatus == WL_IDLE_STATUS)
+    lv_label_set_text(ui_feedbackLabel,"WL_IDLE_STATUS");
+  else if(connectionStatus == WL_CONNECT_FAILED)
+    lv_label_set_text(ui_feedbackLabel,"WL_CONNECT_FAILED");
+  else if(connectionStatus == WL_NO_SSID_AVAIL)
+    lv_label_set_text(ui_feedbackLabel,"WL_NO_SSID_AVAIL");
+  else if(connectionStatus == WL_SCAN_COMPLETED)
+    lv_label_set_text(ui_feedbackLabel,"WL_SCAN_COMPLETED");
+  else if(connectionStatus == WL_CONNECTION_LOST)
+    lv_label_set_text(ui_feedbackLabel,"WL_CONNECTION_LOST");
+  else if(connectionStatus == WL_DISCONNECTED)
+    lv_label_set_text(ui_feedbackLabel,"WL_DISCONNECTED");
+  else
+    lv_label_set_text(ui_feedbackLabel,"WiFi_UNKNOWN");
+}
+
 void Task_TFT(void *pvParameters)
 {
     while (1)
@@ -205,7 +232,7 @@ void Task_main(void *pvParameters)
             if (bezel_left)
             {
                 screen_index--;
-                Serial.print("Bezel rotating: left (down)");
+                Serial.println("Bezel rotating: left (down)");
             }
             else
             {
@@ -280,6 +307,27 @@ void Task_main(void *pvParameters)
             }
             
         }
+        if (connectWiFi)
+        {
+          Serial.println("WiFi details updated, connecting...");
+          Serial.println(SSID);
+          Serial.println(PWD);
+          WiFi.begin(SSID, PWD);
+          connectWiFi = false;
+          checkIP = true;
+        }
+        if (checkIP)
+        {
+          if (WiFi.localIP().toString() != "0.0.0.0")
+          {
+            Serial.println(WiFi.localIP());
+            checkIP = false;
+          }
+          else
+          {
+            // ToDo: do something about showing that WiFi is not connected
+          }
+        }
 
         vTaskDelay(100);
     }
@@ -290,8 +338,12 @@ void setup()
     Serial.begin(115200); /* prepare for possible serial debug */
 
     WiFi.mode(WIFI_STA);
-    // WiFi.disconnect();
-    WiFi.begin(SSID, PWD);
+    WiFi.persistent(true);
+
+    if (strcmp(SSID,"none")==1)
+    {
+      WiFi.begin(SSID, PWD);
+    }    
 
     String LVGL_Arduino = "Hello Arduino! ";
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
@@ -326,6 +378,8 @@ void setup()
     lv_indev_drv_register(&indev_drv);
 
     ui_init();
+
+    updateWiFiState();
 
     Serial.println("Setup done");
 

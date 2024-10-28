@@ -5,8 +5,12 @@
 
 #include "../ui.h"
 
+extern char SSID[];
+extern char PWD[];
+
 void ui_bootInitialScreen_screen_init(void)
 {
+//updateWiFiState();
 ui_bootInitialScreen = lv_obj_create(NULL);
 lv_obj_clear_flag( ui_bootInitialScreen, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM );    /// Flags
 lv_obj_set_style_bg_color(ui_bootInitialScreen, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
@@ -44,10 +48,9 @@ lv_obj_clear_flag( ui_settingsIcon, LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GE
 ui_feedbackLabel = lv_label_create(ui_bootInitialScreen);
 lv_obj_set_width( ui_feedbackLabel, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_feedbackLabel, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_feedbackLabel, 2 );
-lv_obj_set_y( ui_feedbackLabel, -115 );
+lv_obj_set_x( ui_feedbackLabel, 7 );
+lv_obj_set_y( ui_feedbackLabel, -165 );
 lv_obj_set_align( ui_feedbackLabel, LV_ALIGN_CENTER );
-lv_label_set_text(ui_feedbackLabel,"WiFi Connecting...");
 lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_feedbackLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_align(ui_feedbackLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
@@ -61,11 +64,123 @@ lv_obj_set_align( ui_aeLandingIcon, LV_ALIGN_CENTER );
 lv_obj_add_flag( ui_aeLandingIcon, LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
 lv_obj_clear_flag( ui_aeLandingIcon, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
+ui_SSIDLabel = lv_label_create(ui_bootInitialScreen);
+lv_obj_set_width( ui_SSIDLabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_SSIDLabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_SSIDLabel, -89 );
+lv_obj_set_y( ui_SSIDLabel, -138 );
+lv_obj_set_align( ui_SSIDLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_SSIDLabel,"Network SSID:");
+lv_obj_add_flag( ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_SSIDLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+lv_obj_set_style_text_color(ui_SSIDLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_SSIDInputText = lv_textarea_create(ui_bootInitialScreen);
+lv_obj_set_width( ui_SSIDInputText, lv_pct(80));
+lv_obj_set_height( ui_SSIDInputText, LV_SIZE_CONTENT);   /// 35
+lv_obj_set_x( ui_SSIDInputText, 0 );
+lv_obj_set_y( ui_SSIDInputText, -98 );
+lv_obj_set_align( ui_SSIDInputText, LV_ALIGN_CENTER );
+lv_textarea_set_max_length(ui_SSIDInputText,64);
+if (!strncmp(SSID, "none", 4)==0)
+{
+    lv_textarea_set_placeholder_text(ui_SSIDInputText,SSID);
+}
+else
+{
+    lv_textarea_set_placeholder_text(ui_SSIDInputText,"Enter SSID Name...");
+}
+lv_textarea_set_one_line(ui_SSIDInputText,true);
+lv_obj_add_flag( ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_SSIDInputText, LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+lv_obj_set_style_text_color(ui_SSIDInputText, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDInputText, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_bg_color(ui_SSIDInputText, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_SSIDInputText, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+lv_obj_set_style_text_color(ui_SSIDInputText, lv_color_hex(0xFFFFFF), LV_PART_CURSOR | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDInputText, 255, LV_PART_CURSOR| LV_STATE_DEFAULT);
+lv_obj_set_style_bg_color(ui_SSIDInputText, lv_color_hex(0xFFFFFF), LV_PART_CURSOR | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_SSIDInputText, 255, LV_PART_CURSOR| LV_STATE_DEFAULT);
+
+lv_obj_set_style_text_color(ui_SSIDInputText, lv_color_hex(0xFFFFFF), LV_PART_TEXTAREA_PLACEHOLDER | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDInputText, 255, LV_PART_TEXTAREA_PLACEHOLDER| LV_STATE_DEFAULT);
+
+ui_SSIDPasswordLabel = lv_label_create(ui_bootInitialScreen);
+lv_obj_set_width( ui_SSIDPasswordLabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_SSIDPasswordLabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_SSIDPasswordLabel, -80 );
+lv_obj_set_y( ui_SSIDPasswordLabel, 135 );
+lv_obj_set_align( ui_SSIDPasswordLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_SSIDPasswordLabel,"SSID Password:");
+lv_obj_add_flag( ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_SSIDPasswordLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+lv_obj_set_style_text_color(ui_SSIDPasswordLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDPasswordLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_SSIDPasswordInputText = lv_textarea_create(ui_bootInitialScreen);
+lv_obj_set_width( ui_SSIDPasswordInputText, lv_pct(80));
+lv_obj_set_height( ui_SSIDPasswordInputText, LV_SIZE_CONTENT);   /// 35
+lv_obj_set_x( ui_SSIDPasswordInputText, 0 );
+lv_obj_set_y( ui_SSIDPasswordInputText, 97 );
+lv_obj_set_align( ui_SSIDPasswordInputText, LV_ALIGN_CENTER );
+lv_textarea_set_max_length(ui_SSIDPasswordInputText,64);
+if (!strncmp(SSID, "none", 4)==0)
+{
+    //lv_textarea_set_placeholder_text(ui_SSIDInputText, SSID);
+    lv_textarea_set_placeholder_text(ui_SSIDPasswordInputText,PWD);
+}
+else
+{
+    lv_textarea_set_placeholder_text(ui_SSIDPasswordInputText,"Enter SSID Password...");
+}
+lv_textarea_set_one_line(ui_SSIDPasswordInputText,true);
+lv_obj_add_flag( ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_SSIDPasswordInputText, LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+lv_obj_set_style_text_color(ui_SSIDPasswordInputText, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDPasswordInputText, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_bg_color(ui_SSIDPasswordInputText, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_SSIDPasswordInputText, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+lv_obj_set_style_text_color(ui_SSIDPasswordInputText, lv_color_hex(0xFFFFFF), LV_PART_SELECTED | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDPasswordInputText, 255, LV_PART_SELECTED| LV_STATE_DEFAULT);
+lv_obj_set_style_bg_color(ui_SSIDPasswordInputText, lv_color_hex(0x000000), LV_PART_SELECTED | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_SSIDPasswordInputText, 255, LV_PART_SELECTED| LV_STATE_DEFAULT);
+
+lv_obj_set_style_text_color(ui_SSIDPasswordInputText, lv_color_hex(0xFFFFFF), LV_PART_CURSOR | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDPasswordInputText, 255, LV_PART_CURSOR| LV_STATE_DEFAULT);
+lv_obj_set_style_bg_color(ui_SSIDPasswordInputText, lv_color_hex(0xFFFFFF), LV_PART_CURSOR | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_SSIDPasswordInputText, 255, LV_PART_CURSOR| LV_STATE_DEFAULT);
+
+lv_obj_set_style_text_color(ui_SSIDPasswordInputText, lv_color_hex(0xFFFFFF), LV_PART_TEXTAREA_PLACEHOLDER | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_SSIDPasswordInputText, 255, LV_PART_TEXTAREA_PLACEHOLDER| LV_STATE_DEFAULT);
+
+ui_Keyboard = lv_keyboard_create(ui_bootInitialScreen);
+lv_obj_set_width( ui_Keyboard, 470);
+lv_obj_set_height( ui_Keyboard, 152);
+lv_obj_set_align( ui_Keyboard, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_Keyboard, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_set_style_bg_color(ui_Keyboard, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_Keyboard, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+lv_obj_set_style_bg_color(ui_Keyboard, lv_color_hex(0x000000), LV_PART_ITEMS | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_Keyboard, 255, LV_PART_ITEMS| LV_STATE_DEFAULT);
+lv_obj_set_style_border_color(ui_Keyboard, lv_color_hex(0xFFFFFF), LV_PART_ITEMS | LV_STATE_DEFAULT );
+lv_obj_set_style_border_opa(ui_Keyboard, 255, LV_PART_ITEMS| LV_STATE_DEFAULT);
+lv_obj_set_style_border_width(ui_Keyboard, 1, LV_PART_ITEMS| LV_STATE_DEFAULT);
+lv_obj_set_style_outline_color(ui_Keyboard, lv_color_hex(0xFFFFFF), LV_PART_ITEMS | LV_STATE_DEFAULT );
+lv_obj_set_style_outline_opa(ui_Keyboard, 255, LV_PART_ITEMS| LV_STATE_DEFAULT);
+lv_obj_set_style_outline_width(ui_Keyboard, 1, LV_PART_ITEMS| LV_STATE_DEFAULT);
+lv_obj_set_style_outline_pad(ui_Keyboard, 0, LV_PART_ITEMS| LV_STATE_DEFAULT);
+lv_obj_set_style_text_color(ui_Keyboard, lv_color_hex(0xFFFFFF), LV_PART_ITEMS | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_Keyboard, 255, LV_PART_ITEMS| LV_STATE_DEFAULT);
+
 ui_landingBackButton = lv_label_create(ui_bootInitialScreen);
 lv_obj_set_width( ui_landingBackButton, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_landingBackButton, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_landingBackButton, 0 );
-lv_obj_set_y( ui_landingBackButton, 135 );
+lv_obj_set_y( ui_landingBackButton, 180 );
 lv_obj_set_align( ui_landingBackButton, LV_ALIGN_CENTER );
 lv_label_set_text(ui_landingBackButton,"Back");
 lv_obj_add_flag( ui_landingBackButton, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_CLICKABLE );   /// Flags
@@ -83,6 +198,9 @@ lv_obj_set_style_pad_bottom(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEF
 
 lv_obj_add_event_cb(ui_wifiIcon, ui_event_wifiIcon, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_settingsIcon, ui_event_settingsIcon, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_SSIDInputText, ui_event_SSIDInputText, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_SSIDPasswordInputText, ui_event_SSIDPasswordInputText, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_Keyboard, ui_event_Keyboard, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_landingBackButton, ui_event_landingBackButton, LV_EVENT_ALL, NULL);
 
 }
