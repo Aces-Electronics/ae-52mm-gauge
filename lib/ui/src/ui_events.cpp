@@ -11,6 +11,7 @@ extern String SSID;
 extern String PWD;
 extern bool settingsState;
 extern bool syncFlash ;
+extern bool connectWiFi;
 
 void toggleWiFi(lv_event_t * e)
 {
@@ -32,6 +33,7 @@ void toggleWiFi(lv_event_t * e)
 		{
 			LV_LOG_USER("WIFI CONFIGURED AND ON");
 			wifiSetToOn = true;
+			connectWiFi = true;
 			LV_LOG_USER(SSID.c_str());
 			LV_LOG_USER(PWD.c_str());
 			lv_label_set_text(ui_feedbackLabel,"");
