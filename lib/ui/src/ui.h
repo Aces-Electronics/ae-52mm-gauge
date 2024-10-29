@@ -98,15 +98,15 @@ extern lv_obj_t *ui_egtIconScreen;
 extern lv_obj_t *ui_turboIcon;
 extern lv_obj_t *ui____initial_actions0;
 
-LV_IMG_DECLARE( ui_img_807091229);   // assets/ae-wifi-96.png
-LV_IMG_DECLARE( ui_img_501072417);   // assets/ae-cog-96.png
+LV_IMG_DECLARE( ui_img_807091229);          // assets/ae-wifi-96.png
+LV_IMG_DECLARE( ui_img_501072417);          // assets/ae-cog-96.png
 LV_IMG_DECLARE( ui_img_ae_white_128_png);   // assets/ae_white_128.png
-LV_IMG_DECLARE( ui_img_2056808699);   // assets/ae-gauge-battery-128.png
-LV_IMG_DECLARE( ui_img_1105680357);   // assets/ae-oil-temp-128.png
-LV_IMG_DECLARE( ui_img_2930172);   // assets/ae-coolant-128.png
-LV_IMG_DECLARE( ui_img_1209853138);   // assets/ae-turbo-128.png
-LV_IMG_DECLARE( ui_img_2104900491);   // assets/ae-wifi-off-96.png
-LV_IMG_DECLARE( ui_img_943648365);   // assets/ae-wifi-settings-96.png
+LV_IMG_DECLARE( ui_img_2056808699);         // assets/ae-gauge-battery-128.png
+LV_IMG_DECLARE( ui_img_1105680357);         // assets/ae-oil-temp-128.png
+LV_IMG_DECLARE( ui_img_2930172);            // assets/ae-coolant-128.png
+LV_IMG_DECLARE( ui_img_1209853138);         // assets/ae-turbo-128.png
+LV_IMG_DECLARE( ui_img_2104900491);         // assets/ae-wifi-off-96.png
+LV_IMG_DECLARE( ui_img_943648365);          // assets/ae-wifi-settings-96.png
 
 void ui_init(void);
 

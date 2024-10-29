@@ -1,8 +1,11 @@
+#include <Arduino.h>
 #include <lvgl.h>
 #include <Arduino_GFX_Library.h>
 #include <Wire.h>
 #include <ui.h>
 #include <WiFi.h>
+#include <nvs_flash.h>
+#include <Preferences.h>
 
 #include "touch.h"
 #include "passwords.h"
@@ -26,6 +29,8 @@ static const uint16_t screenHeight = 480;
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * screenHeight / 5];
 
+Preferences preferences;
+
 Arduino_ESP32RGBPanel *bus = new Arduino_ESP32RGBPanel(
     1 /* CS */, 46 /* SCK */, 0 /* SDA */,
     2 /* DE */, 42 /* VSYNC */, 3 /* HSYNC */, 45 /* PCLK */,
@@ -48,7 +53,12 @@ bool bezel_left = false;
 bool connectWiFi = false;
 bool disableWiFi = false;
 bool checkIP = false;
-bool wifiOffState = true;
+bool wifiSetToOn = false; // ToDo: sync me from flash
+bool settingsState = false;
+bool toggleIP = true;
+bool SSIDUpdated = false;
+bool SSIDPasswordUpdated = false;
+bool syncFlash = false;
 
 int counter = 0;
 int State;
@@ -61,17 +71,16 @@ int wifi_flag = 0;
 int x = 0, y = 0;
 int loopCounter = 0;
 
-char feedbackLabelString[] = "WIFI: UNKNOWN STATE";
-
 unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 400;    // the debounce time; increase if the output 
 
 #define COLOR_NUM 5
 int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 
-void toggleWiFI(lv_event_t * e)
-{
-    Serial.print("toggling...");
+void flashErase() {
+  nvs_flash_erase(); // erase the NVS partition and...
+  nvs_flash_init(); // initialize the NVS partition.
+  while(true);
 }
 
 void encoder_irq()
@@ -189,45 +198,99 @@ void page_1()
 }
 
 //---------------------------------------------------
-
+static void updateBottomStatus( String text){ // ToDo: fix this
+  lv_label_set_text(ui_feedbackLabel, text.c_str());
+}
 
 void updateWiFiState()
 {
   int connectionStatus = WiFi.status();
-  if(connectionStatus == WL_CONNECTED)
+  if (!settingsState)
   {
-    lv_label_set_text(ui_feedbackLabel,"WiFi: CONNECTED");
+    if (wifiSetToOn)
+    {
+      if(connectionStatus == WL_CONNECTED)
+      {
+        lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+        if (!toggleIP)
+        {
+          lv_label_set_text(ui_feedbackLabel,"WiFi: CONNECTED");
+        }
+        else
+        {
+          updateBottomStatus("IP: " +  WiFi.localIP().toString());
+        }
+      }
+      else if(connectionStatus == WL_IDLE_STATUS)
+      {
+        lv_label_set_text(ui_feedbackLabel,"WiFi: IDLE");
+        lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+      }
+      else if(connectionStatus == WL_CONNECT_FAILED)
+      {
+        lv_label_set_text(ui_feedbackLabel,"WiFi: ERROR");
+        lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+      }
+      else if(connectionStatus == WL_NO_SSID_AVAIL)
+      {
+        lv_label_set_text(ui_feedbackLabel,"WiFi: UNAVAILABLE");
+        lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+      }
+      else if(connectionStatus == WL_SCAN_COMPLETED)
+      {
+        lv_label_set_text(ui_feedbackLabel,"WiFi: SCANNING");
+        lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+      }
+      else if(connectionStatus == WL_CONNECTION_LOST)
+      {
+        if (!wifiSetToOn)
+        {
+          lv_label_set_text(ui_feedbackLabel,"WiFi: DISABLED");
+        
+        }
+        else
+        { 
+          lv_label_set_text(ui_feedbackLabel,"WiFi: DISCONNECTED");
+        }
+        lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+        
+      }
+      else if(connectionStatus == WL_DISCONNECTED)
+      {
+        lv_label_set_text(ui_feedbackLabel,"WiFi: PASS ERROR"); //ToDo: might need to check if SSID is "none"
+        lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+      }
+      else
+      {
+        if (PWD == "none")
+        {
+          lv_label_set_text(ui_feedbackLabel,"WiFi: UNCONFIGURED");
+          lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+        }  
+        printf("WiFi State: %", connectionStatus);
+      }
+    }
+    else
+    {
+      lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
+      if (PWD == "none")
+      {
+        lv_label_set_text(ui_feedbackLabel,"WiFi: UNCONFIGURED");
+        lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+      }  
+      else
+      {
+        lv_label_set_text(ui_feedbackLabel,"WiFi: DISABLED");
+        lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+      }
+      lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+    }
   }
-  else if(connectionStatus == WL_IDLE_STATUS)
-  {
-    lv_label_set_text(ui_feedbackLabel,"WiFi: IDLE");
-  }
-  else if(connectionStatus == WL_CONNECT_FAILED)
-  {
-    lv_label_set_text(ui_feedbackLabel,"WiFi: ERROR");
-  }
-  else if(connectionStatus == WL_NO_SSID_AVAIL)
-  {
-    lv_label_set_text(ui_feedbackLabel,"WiFi: UNAVAILABLE");
-  }
-  else if(connectionStatus == WL_SCAN_COMPLETED)
-  {
-    lv_label_set_text(ui_feedbackLabel,"WiFi: SCANNING");
-  }
-  else if(connectionStatus == WL_CONNECTION_LOST)
-  {
-    lv_label_set_text(ui_feedbackLabel,"WiFi: DISCONNECTED");
-  }
-  else if(connectionStatus == WL_DISCONNECTED)
-  {
-    lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
-    lv_label_set_text(ui_feedbackLabel,"WiFi: UNCONFIGURED"); //ToDo: might need to check if SSID is "none"
-    wifiOffState = false;
-  }
-  else
-  {
-    lv_label_set_text(ui_feedbackLabel,"WiFi: UNKNOWN");
-  }
+}
+
+void disableWifi(){
+  WiFi.disconnect();
+  WiFi.mode(WIFI_OFF);
 }
 
 void Task_TFT(void *pvParameters)
@@ -327,15 +390,34 @@ void Task_main(void *pvParameters)
             }
             
         }
-        if (connectWiFi)
+         if (syncFlash)
+        {
+          if (!wifiSetToOn)
+          {
+            disableWifi();
+          }
+          Serial.print("SETTING : p_wifiOn to ");
+          Serial.println(wifiSetToOn);
+          preferences.begin("ae", false);
+          preferences.putBool("p_wifiOn", wifiSetToOn);
+          wifiSetToOn = preferences.getBool("p_wifiOn");
+          Serial.print("wifiSetToOn RETRIEVED FROM SETTINGS: ");
+          Serial.println(wifiSetToOn);
+          preferences.end();
+          syncFlash = false;
+        }
+
+        if (connectWiFi && wifiSetToOn)
         {
           Serial.println("WiFi details updated, connecting...");
           Serial.println(SSID);
           Serial.println(PWD);
+          lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
           WiFi.begin(SSID, PWD);
           connectWiFi = false;
           checkIP = true;
         }
+
         if (checkIP)
         {
           if (WiFi.localIP().toString() != "0.0.0.0")
@@ -349,9 +431,34 @@ void Task_main(void *pvParameters)
           }
         }
 
-        loopCounter++;
-        if (loopCounter > 500)
+        if (SSIDUpdated)
         {
+          Serial.print("BEFORE SSID SAVED IN FLASH: ");
+          Serial.println(SSID);
+          preferences.begin("ae", false);
+          preferences.putString("p_ssid", SSID);
+          Serial.print("SSID SAVED IN FLASH: ");
+          Serial.println(preferences.getString("p_ssid"));
+          preferences.end();
+          SSIDUpdated = false;
+        }
+
+        if (SSIDPasswordUpdated)
+        {
+          Serial.print("BEFORE PWD SAVED IN FLASH: ");
+          Serial.println(PWD);
+          preferences.begin("ae", false);
+          preferences.putString("p_pwd", PWD);
+          Serial.print("PWD SAVED IN FLASH: ");
+          Serial.println(preferences.getString("p_pwd"));
+          preferences.end();
+          SSIDPasswordUpdated = false;
+        }
+
+        loopCounter++;
+        if (loopCounter > 50) // ~ 5 seconds
+        {
+          toggleIP = !toggleIP;
           updateWiFiState();
           loopCounter = 0;
         }
@@ -362,21 +469,39 @@ void Task_main(void *pvParameters)
 
 void setup()
 {
+    //flashErase();
     Serial.begin(115200); /* prepare for possible serial debug */
 
-    WiFi.mode(WIFI_STA);
-    WiFi.persistent(true);
+    delay(5000);
 
-    if (strcmp(SSID,"none")==1)
+    WiFi.mode(WIFI_STA);
+
+    preferences.begin("ae", true);
+    wifiSetToOn = preferences.getBool("p_wifiOn");
+    Serial.print("wifiSetToOn RETRIEVED FROM FLASH: ");
+    Serial.println(wifiSetToOn);
+    SSID = preferences.getString("p_ssid", "no_p_ssid");
+    Serial.print("SSID RETRIEVED FROM FLASH: ");
+    Serial.println(SSID);
+    PWD = preferences.getString("p_pwd", "no_p_pwd");
+    Serial.print("PWD RETRIEVED FROM FLASH: ");
+    Serial.println(PWD);
+    preferences.end();
+
+    if (wifiSetToOn)
+    {
+      connectWiFi = true;
+    }
+
+    if ((SSID != "none") && (PWD != "none"))
     {
       WiFi.begin(SSID, PWD);
     }    
 
-    String LVGL_Arduino = "Hello Arduino! ";
+    String LVGL_Arduino = "Hello, AE 52mm Gauge using LVGL: ";
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
 
     Serial.println(LVGL_Arduino);
-    Serial.println("I am LVGL_Arduino");
 
     pin_init();
 

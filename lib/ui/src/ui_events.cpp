@@ -6,58 +6,66 @@
 #include "ui.h"
 #include "Arduino.h"
 
-extern bool wifiOffState;
-bool settingsState = false;
-bool wifiSettingsState = false;
+extern bool wifiSetToOn;
+extern String SSID;
+extern String PWD;
+extern bool settingsState;
+extern bool syncFlash ;
 
 void toggleWiFi(lv_event_t * e)
 {
-	if (!settingsState)
+	if (!settingsState) // on the landing page, AKA not in settings
 	{
-		if (!wifiOffState)
+		LV_LOG_USER("CHECKING IF WIFI CAN BE TURNED ON");
+		if ((PWD == "none") || (wifiSetToOn))
 		{
 			lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
-			_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Off!");
-			lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
-		}
+			if (PWD == "none")
+			{
+				LV_LOG_USER("WIFI NOT CONFIGURED");
+			}
+			LV_LOG_USER("WIFI SET TO OFF");
+			wifiSetToOn = false;
+			syncFlash = true;
+		}  
 		else
 		{
+			LV_LOG_USER("WIFI CONFIGURED AND ON");
+			wifiSetToOn = true;
+			LV_LOG_USER(SSID.c_str());
+			LV_LOG_USER(PWD.c_str());
+			lv_label_set_text(ui_feedbackLabel,"");
 			lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
-			_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Connecting...");
-			lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
-		}
+			syncFlash = true;
+		}	
 	}
 	else
 	{
-		if (!wifiSettingsState)
-		{
-			lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+		LV_LOG_USER("WIFI SETTINGS PRESSED");;
 
-			lv_obj_clear_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_clear_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_clear_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_clear_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
-			//lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);	
-		}
-		else
-		{
-			wifiSettingsState = true;
-		}
+		lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+
+		lv_obj_clear_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
+
+		lv_obj_set_y( ui_feedbackLabel, -170 );
+		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi SETTINGS: ");
 	}
-	wifiOffState = !wifiOffState;
 }
 
 void settingsButtonPressedFunction(lv_event_t * e)
 {
-	settingsState = !settingsState;
+	LV_LOG_USER("SETTINGS BUTTON PRESSED");
+	settingsState = true;
 	if (settingsState)
 	{
-		lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
 		//lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
-		lv_img_set_src(ui_wifiIcon, &ui_img_943648365); // WiFi off
+		lv_img_set_src(ui_wifiIcon, &ui_img_943648365); // WiFi settings
 		lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
 		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "SETTINGS: ");
@@ -68,20 +76,34 @@ void settingsButtonPressedFunction(lv_event_t * e)
 
 void landingBackButtonPressedFunction(lv_event_t * e)
 {
-	lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_clear_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_clear_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_add_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
-	if (!wifiOffState)
+	if (settingsState)
 	{
-		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Off!");
-	}
-	else
-	{
-		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi Connecting...");
-		lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+		LV_LOG_USER("BACK BUTTON PRESSED");
+		lv_obj_add_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
 
+		lv_obj_set_y( ui_feedbackLabel, -125 );
+		lv_obj_set_y( ui_SSIDLabel, -90 );
+		lv_obj_set_y( ui_SSIDInputText, -58 );
+		lv_obj_set_y( ui_SSIDPasswordLabel, 15 );
+		lv_obj_set_y( ui_SSIDPasswordInputText, 48 );
+
+		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "");
+
+		if (wifiSetToOn)
+		{
+			lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
+		}
+		else
+		{
+			lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
+		}
 	}
-	settingsState = !settingsState;
+	settingsState = false;
 }

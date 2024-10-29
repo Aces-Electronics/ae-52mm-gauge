@@ -5,16 +5,12 @@
 
 #include "ui.h"
 #include "ui_helpers.h"
-#include <string.h>
+#include "Arduino.h"
 
-
-extern char SSID[];
-extern char PWD[];
-
-char test[] = "test";
-
-extern bool connectWiFi;
+extern String SSID;
+extern String PWD;
 extern bool disableWiFi;
+extern bool settingsState;
 
 ///////////////////// VARIABLES ////////////////////
 
@@ -106,8 +102,8 @@ const lv_img_dsc_t *ui_imgset_ae_white_[1] = {&ui_img_ae_white_128_png};
 
 bool SSIDField = false;
 bool SSIDPasswordField = false;
-bool SSIDUpdated = false;
-bool SSIDPasswordUpdated = false;
+extern bool SSIDUpdated;
+extern bool SSIDPasswordUpdated;
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
 #if LV_COLOR_DEPTH != 16
@@ -136,13 +132,17 @@ void ui_event_SSIDInputText( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
     if ( event_code == LV_EVENT_PRESSED) {
 
-        if (strncmp(SSID, "none", 4)==0)
+        if (SSID != "none")
         {
-            //lv_textarea_set_placeholder_text(ui_SSIDInputText, SSID);
-            lv_textarea_set_placeholder_text(ui_SSIDInputText,"turdsting");
+            lv_textarea_set_placeholder_text(ui_SSIDInputText, SSID.c_str());
         }  
         SSIDField = true;
         _ui_keyboard_set_target(ui_Keyboard,  ui_SSIDInputText);
+        lv_obj_set_y( ui_SSIDLabel, -138 );
+        lv_obj_set_y( ui_SSIDInputText, -98 );
+        lv_obj_add_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
         _ui_flag_modify( ui_Keyboard, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_REMOVE);
     }
 }
@@ -150,16 +150,22 @@ void ui_event_SSIDPasswordInputText( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
     if ( event_code == LV_EVENT_PRESSED) 
     {
-        if (strncmp(PWD, "none", 4)==0)
+        if (PWD != "none")
         {
-            lv_textarea_set_placeholder_text(ui_SSIDPasswordInputText, PWD);
+            lv_textarea_set_placeholder_text(ui_SSIDPasswordInputText, PWD.c_str());
         }  
         SSIDPasswordField = true;
         _ui_keyboard_set_target(ui_Keyboard,  ui_SSIDPasswordInputText);
+        lv_obj_set_y( ui_SSIDPasswordLabel, -138 );
+        lv_obj_set_y( ui_SSIDPasswordInputText, -98 );
+        lv_obj_add_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
         _ui_flag_modify( ui_Keyboard, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_REMOVE);
     }
 }
-void ui_event_Keyboard( lv_event_t * e) {
+void ui_event_Keyboard( lv_event_t * e) 
+{
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
     if ( event_code == LV_EVENT_READY) 
     {
@@ -168,29 +174,79 @@ void ui_event_Keyboard( lv_event_t * e) {
         if (SSIDField)
         {
             LV_LOG_USER("Saving SSID...");
-            strcpy(SSID, lv_textarea_get_text(ui_SSIDInputText)); //ToDo: store these in flash
+            SSID = lv_textarea_get_text(ui_SSIDInputText); 
             SSIDField = false;
             SSIDUpdated = true;
         }
         else if (SSIDPasswordField)
         {
             LV_LOG_USER("Saving Password...");
-            strcpy(PWD, lv_textarea_get_text(ui_SSIDPasswordInputText)); //ToDo: store these in flash
+            PWD = lv_textarea_get_text(ui_SSIDPasswordInputText);
             SSIDPasswordField = false;
             SSIDPasswordUpdated = true;
         }
         
         if (SSIDUpdated && SSIDPasswordUpdated)
         {
-            connectWiFi = true;
+            lv_obj_set_y( ui_feedbackLabel, -125 );
+            lv_obj_set_y( ui_SSIDLabel, -90 );
+            lv_obj_set_y( ui_SSIDInputText, -58 );
+            lv_obj_set_y( ui_SSIDPasswordLabel, 15 );
+            lv_obj_set_y( ui_SSIDPasswordInputText, 48 );
+
+            lv_obj_add_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
+
+            lv_obj_clear_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+
+            lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+            _ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "");
+            SSIDUpdated = false;
+            SSIDPasswordUpdated = false;
+            settingsState = false;
         } 
+        else if ((SSIDUpdated && !SSIDPasswordUpdated) || (!SSIDUpdated && SSIDPasswordUpdated)) //if one or the other but not both
+        {
+            _ui_flag_modify( ui_Keyboard, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_ADD);
+            lv_obj_clear_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
+
+            lv_obj_set_y( ui_feedbackLabel, -125 );
+            lv_obj_set_y( ui_SSIDLabel, -90 );
+            lv_obj_set_y( ui_SSIDInputText, -58 );
+            lv_obj_set_y( ui_SSIDPasswordLabel, 15 );
+            lv_obj_set_y( ui_SSIDPasswordInputText, 48 );
+            lv_obj_set_y( ui_feedbackLabel, -170 );
+        }
     }
     if ( event_code == LV_EVENT_CANCEL) {
         _ui_flag_modify( ui_Keyboard, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_ADD);
+        lv_obj_clear_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
+
+        lv_obj_set_y( ui_feedbackLabel, -125 );
+        lv_obj_set_y( ui_SSIDLabel, -90 );
+        lv_obj_set_y( ui_SSIDInputText, -58 );
+        lv_obj_set_y( ui_SSIDPasswordLabel, 15 );
+        lv_obj_set_y( ui_SSIDPasswordInputText, 48 );
+        lv_obj_set_y( ui_feedbackLabel, -170 );
+
         SSIDPasswordField = false;
         SSIDField = false;
     }
 }
+
 void ui_event_landingBackButton( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_PRESSED) {
