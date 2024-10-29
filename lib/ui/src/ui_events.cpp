@@ -34,6 +34,7 @@ void toggleWiFi(lv_event_t * e)
 			LV_LOG_USER("WIFI CONFIGURED AND ON");
 			wifiSetToOn = true;
 			connectWiFi = true;
+			lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
 			LV_LOG_USER(SSID.c_str());
 			LV_LOG_USER(PWD.c_str());
 			lv_label_set_text(ui_feedbackLabel,"");

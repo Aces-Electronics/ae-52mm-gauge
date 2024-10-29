@@ -132,7 +132,7 @@ void ui_event_SSIDInputText( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
     if ( event_code == LV_EVENT_PRESSED) {
 
-        if (SSID != "none")
+        if (SSID != "none") // ToDo: not working
         {
             lv_textarea_set_placeholder_text(ui_SSIDInputText, SSID.c_str());
         }  
@@ -150,7 +150,7 @@ void ui_event_SSIDPasswordInputText( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
     if ( event_code == LV_EVENT_PRESSED) 
     {
-        if (PWD != "none")
+        if (PWD != "none") // ToDo: not working
         {
             lv_textarea_set_placeholder_text(ui_SSIDPasswordInputText, PWD.c_str());
         }  

@@ -212,7 +212,7 @@ void updateWiFiState()
       if(connectionStatus == WL_CONNECTED)
       {
         lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
-        if (!toggleIP)
+        if (toggleIP)
         {
           lv_label_set_text(ui_feedbackLabel,"WiFi: CONNECTED");
         }
