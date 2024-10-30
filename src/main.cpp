@@ -62,6 +62,7 @@ bool toggleIP = true;
 bool SSIDUpdated = false;
 bool SSIDPasswordUpdated = false;
 bool syncFlash = false;
+bool validLocation = false;
 
 int counter = 0;
 int State;
@@ -225,16 +226,23 @@ void getGeoLocation()
       //Serial.print("UTC Offset: ");               Serial.println(loc.offset);        // int  (eg. -1000 means -10 hours, 0 minutes)
       //Serial.print("Offset Seconds: ");           Serial.println(loc.offsetSeconds); // long    
 
+      validLocation = true;
+
       lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
       lv_obj_clear_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
-      lv_label_set_text(ui_aeLandingBottomLabel,loc.city);
+      char myNewCombinedArray[48];
+      strcpy(myNewCombinedArray, loc.city);
+      strcat(myNewCombinedArray, ", ");
+      strcat(myNewCombinedArray, loc.region);
+      lv_label_set_text(ui_aeLandingBottomLabel, myNewCombinedArray);
 
 
       geoRequestCounter = 0;
     } 
     else
     {
-      Serial.println("Data received was not valid, trying again...");
+      Serial.println("Location data received was not valid, trying again...");
+      validLocation = false;
       lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
       if (geoRequestCounter < 6)
@@ -465,7 +473,6 @@ void Task_main(void *pvParameters)
         {
           if (WiFi.localIP().toString() != "0.0.0.0")
           {
-            Serial.println(WiFi.localIP());
             checkIP = false;
             getGeoLocation();
           }

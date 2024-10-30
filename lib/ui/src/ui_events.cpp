@@ -12,6 +12,7 @@ extern String PWD;
 extern bool settingsState;
 extern bool syncFlash ;
 extern bool connectWiFi;
+extern bool validLocation;
 
 void toggleWiFi(lv_event_t * e)
 {
@@ -69,8 +70,12 @@ void settingsButtonPressedFunction(lv_event_t * e)
 	{
 		//lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_img_set_src(ui_wifiIcon, &ui_img_943648365); // WiFi settings
-		lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_img_set_src(ui_aeLandingIcon, &ui_img_1749172309); // Gauge settings
+		lv_img_set_src(ui_settingsIcon, &ui_img_2022370193); // ESP now settings
+
+		lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+      	lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+
 		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "SETTINGS: ");
 		lv_obj_clear_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
 	}
@@ -87,9 +92,25 @@ void landingBackButtonPressedFunction(lv_event_t * e)
 		lv_obj_add_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
+
 		lv_obj_clear_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+
+		if (validLocation) 
+		{	
+			lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        	lv_obj_clear_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+		}
+		else
+		{
+			lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        	lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+		}
+		
+ 
+		lv_img_set_src(ui_settingsIcon, &ui_img_501072417); // settings Icon
+		lv_img_set_src(ui_aeLandingIcon, &ui_img_ae_white_128_png); // AE Landing Icon
 
 		lv_obj_set_y( ui_feedbackLabel, -125 );
 		lv_obj_set_y( ui_SSIDLabel, -90 );

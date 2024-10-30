@@ -213,7 +213,7 @@ lv_obj_set_style_pad_bottom(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEF
 ui_aeLandingBottomLabel = lv_label_create(ui_bootInitialScreen);
 lv_obj_set_width( ui_aeLandingBottomLabel, 280);
 lv_obj_set_height( ui_aeLandingBottomLabel, 64);
-lv_obj_set_x( ui_aeLandingBottomLabel, 6 );
+lv_obj_set_x( ui_aeLandingBottomLabel, 0 );
 lv_obj_set_y( ui_aeLandingBottomLabel, 140 );
 lv_obj_set_align( ui_aeLandingBottomLabel, LV_ALIGN_CENTER );
 lv_label_set_text(ui_aeLandingBottomLabel,"NO LOCATION");
@@ -227,15 +227,17 @@ lv_obj_set_style_pad_left(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEF
 lv_obj_set_style_pad_right(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_top(ui_aeLandingBottomLabel, 20, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_bottom(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_label_set_long_mode(ui_aeLandingBottomLabel, LV_LABEL_LONG_SCROLL_CIRCULAR );
+lv_textarea_set_max_length(ui_aeLandingBottomLabel, 19);
 
 ui_aeLandingBottomIcon = lv_img_create(ui_aeLandingBottomLabel);
 lv_img_set_src(ui_aeLandingBottomIcon, &ui_img_1917549703);
 lv_obj_set_width( ui_aeLandingBottomIcon, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_aeLandingBottomIcon, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_aeLandingBottomIcon, -120 );
-lv_obj_set_y( ui_aeLandingBottomIcon, -12 );
-lv_obj_set_align( ui_aeLandingBottomIcon, LV_ALIGN_CENTER );
-lv_obj_add_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
+lv_obj_set_x( ui_aeLandingBottomIcon, -30 );
+lv_obj_set_y( ui_aeLandingBottomIcon, -15 );
+lv_obj_set_align( ui_aeLandingBottomIcon, LV_ALIGN_LEFT_MID );
+lv_obj_add_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_ADV_HITTEST| LV_OBJ_FLAG_HIDDEN);   /// Flags
 lv_obj_clear_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_img_set_zoom(ui_aeLandingBottomIcon,128);
 
