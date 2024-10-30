@@ -110,3 +110,8 @@ void landingBackButtonPressedFunction(lv_event_t * e)
 	}
 	settingsState = false;
 }
+
+void aeLandingIconFunction(lv_event_t * e)
+{
+	// Your code here
+}

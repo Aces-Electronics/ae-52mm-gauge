@@ -4,7 +4,6 @@
 #include <Wire.h>
 #include <ui.h>
 #include <WiFi.h>
-//#include <WiFiMulti.h>
 #include <nvs_flash.h>
 #include <Preferences.h>
 #include <GeoIP.h>
@@ -226,7 +225,7 @@ void getGeoLocation()
       Serial.print("UTC Offset: ");               Serial.println(loc.offset);        // int  (eg. -1000 means -10 hours, 0 minutes)
       Serial.print("Offset Seconds: ");           Serial.println(loc.offsetSeconds); // long    
 
-      lv_label_set_text(ui_aeLandingBottomLabel,loc.city);
+      //lv_label_set_text(ui_aeLandingBottomLabel,loc.city);
 
       geoRequestCounter = 0;
     } 

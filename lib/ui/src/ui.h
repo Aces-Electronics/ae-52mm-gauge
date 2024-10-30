@@ -25,15 +25,15 @@ extern "C" {
 #include "ui_helpers.h"
 #include "ui_events.h"
 // SCREEN: ui_bootInitialScreen
-void updateWiFiState();
 void ui_bootInitialScreen_screen_init(void);
 extern lv_obj_t *ui_bootInitialScreen;
 extern lv_obj_t *ui_Spinner1;
+extern lv_obj_t *ui_feedbackLabel;
 void ui_event_wifiIcon( lv_event_t * e);
 extern lv_obj_t *ui_wifiIcon;
 void ui_event_settingsIcon( lv_event_t * e);
 extern lv_obj_t *ui_settingsIcon;
-extern lv_obj_t *ui_feedbackLabel;
+void ui_event_aeLandingIcon( lv_event_t * e);
 extern lv_obj_t *ui_aeLandingIcon;
 extern lv_obj_t *ui_SSIDLabel;
 void ui_event_SSIDInputText( lv_event_t * e);
@@ -45,6 +45,8 @@ void ui_event_Keyboard( lv_event_t * e);
 extern lv_obj_t *ui_Keyboard;
 void ui_event_landingBackButton( lv_event_t * e);
 extern lv_obj_t *ui_landingBackButton;
+extern lv_obj_t *ui_aeLandingBottomIcon;
+extern lv_obj_t *ui_aeLandingBottomLabel;
 // SCREEN: ui_batteryScreen
 void ui_batteryScreen_screen_init(void);
 extern lv_obj_t *ui_batteryScreen;
@@ -98,15 +100,20 @@ extern lv_obj_t *ui_egtIconScreen;
 extern lv_obj_t *ui_turboIcon;
 extern lv_obj_t *ui____initial_actions0;
 
-LV_IMG_DECLARE( ui_img_807091229);          // assets/ae-wifi-96.png
-LV_IMG_DECLARE( ui_img_501072417);          // assets/ae-cog-96.png
+LV_IMG_DECLARE( ui_img_807091229);   // assets/ae-wifi-96.png
+LV_IMG_DECLARE( ui_img_501072417);   // assets/ae-cog-96.png
 LV_IMG_DECLARE( ui_img_ae_white_128_png);   // assets/ae_white_128.png
-LV_IMG_DECLARE( ui_img_2056808699);         // assets/ae-gauge-battery-128.png
-LV_IMG_DECLARE( ui_img_1105680357);         // assets/ae-oil-temp-128.png
-LV_IMG_DECLARE( ui_img_2930172);            // assets/ae-coolant-128.png
-LV_IMG_DECLARE( ui_img_1209853138);         // assets/ae-turbo-128.png
-LV_IMG_DECLARE( ui_img_2104900491);         // assets/ae-wifi-off-96.png
-LV_IMG_DECLARE( ui_img_943648365);          // assets/ae-wifi-settings-96.png
+LV_IMG_DECLARE( ui_img_1917549703);   // assets/ae-map-marker-96.png
+LV_IMG_DECLARE( ui_img_2056808699);   // assets/ae-gauge-battery-128.png
+LV_IMG_DECLARE( ui_img_1105680357);   // assets/ae-oil-temp-128.png
+LV_IMG_DECLARE( ui_img_2930172);   // assets/ae-coolant-128.png
+LV_IMG_DECLARE( ui_img_1209853138);   // assets/ae-turbo-128.png
+LV_IMG_DECLARE( ui_img_2104900491);   // assets/ae-wifi-off-96.png
+LV_IMG_DECLARE( ui_img_943648365);   // assets/ae-wifi-settings-96.png
+LV_IMG_DECLARE( ui_img_2022370193);   // assets/ae-esp-now-96.png
+LV_IMG_DECLARE( ui_img_539538216);   // assets/ae-settings-erase-96.png
+LV_IMG_DECLARE( ui_img_1749172309);   // assets/ae-gauge-settings-96.png
+LV_IMG_DECLARE( ui_img_2105704960);   // assets/ae-low-rssi-96.png
 
 void ui_init(void);
 
