@@ -4,8 +4,10 @@
 #include <Wire.h>
 #include <ui.h>
 #include <WiFi.h>
+//#include <WiFiMulti.h>
 #include <nvs_flash.h>
 #include <Preferences.h>
+#include <GeoIP.h>
 
 #include "touch.h"
 #include "passwords.h"
@@ -20,8 +22,6 @@
 #define ENCODER_CLK 13 // CLK
 #define ENCODER_DT 10  // DT
 
-/*Don't forget to set Sketchbook location in File/Preferencesto the path of your UI project (the parent foder of this INO file)*/
-
 /*Change to your screen resolution*/
 static const uint16_t screenWidth = 480;
 static const uint16_t screenHeight = 480;
@@ -30,6 +30,10 @@ static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * screenHeight / 5];
 
 Preferences preferences;
+GeoIP geoip;  
+//WiFiMulti wifiMulti;                   // create WiFiMulti object 'wifiMulti' 
+
+location_t loc;                               // data structure to hold results 
 
 Arduino_ESP32RGBPanel *bus = new Arduino_ESP32RGBPanel(
     1 /* CS */, 46 /* SCK */, 0 /* SDA */,
@@ -70,6 +74,7 @@ int screen_index = 0;
 int wifi_flag = 0;
 int x = 0, y = 0;
 int loopCounter = 0;
+int geoRequestCounter = 0;
 
 unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 400;    // the debounce time; increase if the output 
@@ -197,8 +202,48 @@ void page_1()
     flesh_flag = 0;
 }
 
+void getGeoLocation()
+{
+	Serial.println("Trying to infer GeoLocation from IP...");
+  if (WiFi.status() == WL_CONNECTED) 
+  {
+
+    // Use one of the following function calls. If using API key it must be inside double quotation marks.
+    
+    //loc = geoip.getGeoFromWiFi(false);                   // no key, results not shown on serial monitor
+    loc = geoip.getGeoFromWiFi(true);                    // no key, show results on on serial monitor
+    //loc = geoip.getGeoFromWiFi("Your API Key", false);   // use API key, results not shown on serial monitor
+    //loc = geoip.getGeoFromWiFi(googleApiKey, true);    // use API key, show results on on serial monitor    
+    if (loc.status)                          // Check to see if the data came in from the server.
+    {
+      // Display information from GeoIP. The library can do this too if true is added to the function call.   
+      Serial.print("\nLatitude: ");               Serial.println(loc.latitude);      // float
+      Serial.print("Longitude: ");                Serial.println(loc.longitude);     // float
+      Serial.print("City: ");                     Serial.println(loc.city);          // char[24]
+      Serial.print("Region: ");                   Serial.println(loc.region);        // char[24]
+      Serial.print("Country: ");                  Serial.println(loc.country);       // char[24]    
+      Serial.print("Timezone: ");                 Serial.println(loc.timezone);      // char[24]
+      Serial.print("UTC Offset: ");               Serial.println(loc.offset);        // int  (eg. -1000 means -10 hours, 0 minutes)
+      Serial.print("Offset Seconds: ");           Serial.println(loc.offsetSeconds); // long    
+
+      lv_label_set_text(ui_aeLandingBottomLabel,loc.city);
+
+      geoRequestCounter = 0;
+    } 
+    else
+    {
+      Serial.println("Data received was not valid, trying again...");
+      if (geoRequestCounter < 6)
+      {
+        getGeoLocation();
+        geoRequestCounter++;
+      }
+    }                                 
+  } 
+}
+
 //---------------------------------------------------
-static void updateBottomStatus( String text){ // ToDo: fix this
+static void updateTopStatus( String text){ // ToDo: fix this
   lv_label_set_text(ui_feedbackLabel, text.c_str());
 }
 
@@ -215,10 +260,11 @@ void updateWiFiState()
         if (toggleIP)
         {
           lv_label_set_text(ui_feedbackLabel,"WiFi: CONNECTED");
+          lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
         }
         else
         {
-          updateBottomStatus("IP: " +  WiFi.localIP().toString());
+          updateTopStatus("IP: " +  WiFi.localIP().toString());
         }
       }
       else if(connectionStatus == WL_IDLE_STATUS)
@@ -396,26 +442,20 @@ void Task_main(void *pvParameters)
           {
             disableWifi();
           }
-          Serial.print("SETTING : p_wifiOn to ");
-          Serial.println(wifiSetToOn);
           preferences.begin("ae", false);
           preferences.putBool("p_wifiOn", wifiSetToOn);
           wifiSetToOn = preferences.getBool("p_wifiOn");
-          Serial.print("wifiSetToOn RETRIEVED FROM SETTINGS: ");
-          Serial.println(wifiSetToOn);
           preferences.end();
           syncFlash = false;
         }
 
         if (connectWiFi && wifiSetToOn)
         {
-          Serial.println("WiFi details updated, connecting...");
-          Serial.println(SSID);
-          Serial.println(PWD);
           lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
           WiFi.begin(SSID, PWD);
           connectWiFi = false;
           checkIP = true;
+          getGeoLocation();
         }
 
         if (checkIP)
@@ -427,30 +467,24 @@ void Task_main(void *pvParameters)
           }
           else
           {
-            // ToDo: do something about showing that WiFi is not connected
+            lv_label_set_text(ui_feedbackLabel,"WiFi: NO IP ADDRESS");
           }
         }
 
+        if (ARDUINO_EVENT_WIFI_STA_GOT_IP)
+
         if (SSIDUpdated)
         {
-          Serial.print("BEFORE SSID SAVED IN FLASH: ");
-          Serial.println(SSID);
           preferences.begin("ae", false);
           preferences.putString("p_ssid", SSID);
-          Serial.print("SSID SAVED IN FLASH: ");
-          Serial.println(preferences.getString("p_ssid"));
           preferences.end();
           SSIDUpdated = false;
         }
 
         if (SSIDPasswordUpdated)
         {
-          Serial.print("BEFORE PWD SAVED IN FLASH: ");
-          Serial.println(PWD);
           preferences.begin("ae", false);
           preferences.putString("p_pwd", PWD);
-          Serial.print("PWD SAVED IN FLASH: ");
-          Serial.println(preferences.getString("p_pwd"));
           preferences.end();
           SSIDPasswordUpdated = false;
         }
@@ -478,14 +512,8 @@ void setup()
 
     preferences.begin("ae", true);
     wifiSetToOn = preferences.getBool("p_wifiOn");
-    Serial.print("wifiSetToOn RETRIEVED FROM FLASH: ");
-    Serial.println(wifiSetToOn);
     SSID = preferences.getString("p_ssid", "no_p_ssid");
-    Serial.print("SSID RETRIEVED FROM FLASH: ");
-    Serial.println(SSID);
     PWD = preferences.getString("p_pwd", "no_p_pwd");
-    Serial.print("PWD RETRIEVED FROM FLASH: ");
-    Serial.println(PWD);
     preferences.end();
 
     if (wifiSetToOn)
@@ -498,7 +526,7 @@ void setup()
       WiFi.begin(SSID, PWD);
     }    
 
-    String LVGL_Arduino = "Hello, AE 52mm Gauge using LVGL: ";
+    String LVGL_Arduino = "Hello from an AE 52mm Gauge using LVGL: ";
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
 
     Serial.println(LVGL_Arduino);
@@ -533,7 +561,7 @@ void setup()
 
     updateWiFiState();
 
-    Serial.println("Setup done");
+    Serial.println("AE 52mm Gauge: Operational!");
 
     xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(Task_main, "Task_main", 40960, NULL, 3, NULL, 1);
@@ -541,4 +569,5 @@ void setup()
 
 void loop()
 {
+
 }

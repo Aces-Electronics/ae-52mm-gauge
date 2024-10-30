@@ -9,3 +9,7 @@ def landingBackButtonPressedFunction(event_struct):
 def toggleWiFi(event_struct):
     return
 
+
+def aeLandingIconFunction(event_struct):
+    return
+
