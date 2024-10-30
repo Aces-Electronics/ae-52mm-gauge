@@ -18,11 +18,12 @@ extern bool settingsState;
 void ui_bootInitialScreen_screen_init(void);
 lv_obj_t *ui_bootInitialScreen;
 lv_obj_t *ui_Spinner1;
+lv_obj_t *ui_feedbackLabel;
 void ui_event_wifiIcon( lv_event_t * e);
 lv_obj_t *ui_wifiIcon;
 void ui_event_settingsIcon( lv_event_t * e);
 lv_obj_t *ui_settingsIcon;
-lv_obj_t *ui_feedbackLabel;
+void ui_event_aeLandingIcon( lv_event_t * e);
 lv_obj_t *ui_aeLandingIcon;
 lv_obj_t *ui_SSIDLabel;
 void ui_event_SSIDInputText( lv_event_t * e);
@@ -34,6 +35,8 @@ void ui_event_Keyboard( lv_event_t * e);
 lv_obj_t *ui_Keyboard;
 void ui_event_landingBackButton( lv_event_t * e);
 lv_obj_t *ui_landingBackButton;
+lv_obj_t *ui_aeLandingBottomIcon;
+lv_obj_t *ui_aeLandingBottomLabel;
 
 // SCREEN: ui_batteryScreen
 void ui_batteryScreen_screen_init(void);
@@ -99,6 +102,11 @@ const lv_img_dsc_t *ui_imgset_23834059[1] = {&ui_img_807091229};
 const lv_img_dsc_t *ui_imgset_2073783661[1] = {&ui_img_2104900491};
 const lv_img_dsc_t *ui_imgset_2029485955[1] = {&ui_img_943648365};
 const lv_img_dsc_t *ui_imgset_ae_white_[1] = {&ui_img_ae_white_128_png};
+const lv_img_dsc_t *ui_imgset_609165137[1] = {&ui_img_2022370193};
+const lv_img_dsc_t *ui_imgset_2041518705[1] = {&ui_img_1917549703};
+const lv_img_dsc_t *ui_imgset_737743436[1] = {&ui_img_539538216};
+const lv_img_dsc_t *ui_imgset_340495923[1] = {&ui_img_1749172309};
+const lv_img_dsc_t *ui_imgset_505348764[1] = {&ui_img_2105704960};
 
 bool SSIDField = false;
 bool SSIDPasswordField = false;
@@ -126,6 +134,12 @@ void ui_event_settingsIcon( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_PRESSED) {
       settingsButtonPressedFunction( e );
+}
+}
+void ui_event_aeLandingIcon( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_PRESSED) {
+      aeLandingIconFunction( e );
 }
 }
 void ui_event_SSIDInputText( lv_event_t * e) {
