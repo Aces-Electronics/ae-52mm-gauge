@@ -209,29 +209,34 @@ void getGeoLocation()
 
     // Use one of the following function calls. If using API key it must be inside double quotation marks.
     
-    //loc = geoip.getGeoFromWiFi(false);                   // no key, results not shown on serial monitor
-    loc = geoip.getGeoFromWiFi(true);                    // no key, show results on on serial monitor
+    loc = geoip.getGeoFromWiFi(false);                   // no key, results not shown on serial monitor
+    //loc = geoip.getGeoFromWiFi(true);                    // no key, show results on on serial monitor
     //loc = geoip.getGeoFromWiFi("Your API Key", false);   // use API key, results not shown on serial monitor
     //loc = geoip.getGeoFromWiFi(googleApiKey, true);    // use API key, show results on on serial monitor    
     if (loc.status)                          // Check to see if the data came in from the server.
     {
       // Display information from GeoIP. The library can do this too if true is added to the function call.   
-      Serial.print("\nLatitude: ");               Serial.println(loc.latitude);      // float
-      Serial.print("Longitude: ");                Serial.println(loc.longitude);     // float
-      Serial.print("City: ");                     Serial.println(loc.city);          // char[24]
-      Serial.print("Region: ");                   Serial.println(loc.region);        // char[24]
-      Serial.print("Country: ");                  Serial.println(loc.country);       // char[24]    
-      Serial.print("Timezone: ");                 Serial.println(loc.timezone);      // char[24]
-      Serial.print("UTC Offset: ");               Serial.println(loc.offset);        // int  (eg. -1000 means -10 hours, 0 minutes)
-      Serial.print("Offset Seconds: ");           Serial.println(loc.offsetSeconds); // long    
+      //Serial.print("\nLatitude: ");               Serial.println(loc.latitude);      // float
+      //Serial.print("Longitude: ");                Serial.println(loc.longitude);     // float
+      //Serial.print("City: ");                     Serial.println(loc.city);          // char[24]
+      //Serial.print("Region: ");                   Serial.println(loc.region);        // char[24]
+      //Serial.print("Country: ");                  Serial.println(loc.country);       // char[24]    
+      //Serial.print("Timezone: ");                 Serial.println(loc.timezone);      // char[24]
+      //Serial.print("UTC Offset: ");               Serial.println(loc.offset);        // int  (eg. -1000 means -10 hours, 0 minutes)
+      //Serial.print("Offset Seconds: ");           Serial.println(loc.offsetSeconds); // long    
 
-      //lv_label_set_text(ui_aeLandingBottomLabel,loc.city);
+      lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_clear_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+      lv_label_set_text(ui_aeLandingBottomLabel,loc.city);
+
 
       geoRequestCounter = 0;
     } 
     else
     {
       Serial.println("Data received was not valid, trying again...");
+      lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
       if (geoRequestCounter < 6)
       {
         getGeoLocation();
@@ -454,7 +459,6 @@ void Task_main(void *pvParameters)
           WiFi.begin(SSID, PWD);
           connectWiFi = false;
           checkIP = true;
-          getGeoLocation();
         }
 
         if (checkIP)
@@ -463,6 +467,7 @@ void Task_main(void *pvParameters)
           {
             Serial.println(WiFi.localIP());
             checkIP = false;
+            getGeoLocation();
           }
           else
           {
