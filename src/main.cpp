@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <lvgl.h>
 #include <Arduino_GFX_Library.h>
+#include <BLEDevice.h>
+#include <BLEScan.h>
+#include <BLEAdvertisedDevice.h>
 #include <Wire.h>
 #include <ui.h>
 #include <WiFi.h>
@@ -10,6 +13,9 @@
 
 #include "touch.h"
 #include "passwords.h"
+#include <aes/esp_aes.h>        // AES library for decrypting the Victron manufacturer data.
+
+//#define USE_String
 
 #define I2C_SDA_PIN 17
 #define I2C_SCL_PIN 18
@@ -29,8 +35,8 @@ static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * screenHeight / 5];
 
 Preferences preferences;
-GeoIP geoip;  
-//WiFiMulti wifiMulti;                   // create WiFiMulti object 'wifiMulti' 
+GeoIP geoip; 
+BLEScan *pBLEScan;
 
 location_t loc;                               // data structure to hold results 
 
@@ -56,7 +62,7 @@ bool bezel_left = false;
 bool connectWiFi = false;
 bool disableWiFi = false;
 bool checkIP = false;
-bool wifiSetToOn = false; // ToDo: sync me from flash
+bool wifiSetToOn = false;
 bool settingsState = false;
 bool toggleIP = true;
 bool SSIDUpdated = false;
@@ -75,12 +81,157 @@ int wifi_flag = 0;
 int x = 0, y = 0;
 int loopCounter = 0;
 int geoRequestCounter = 0;
+int keyBits=128;  // Number of bits for AES-CTR decrypt.
+int scanTime = 1; // BLE scan time (seconds)
+
+char savedDeviceName[32];   // cached copy of the device name (31 chars max) + \0
 
 unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 400;    // the debounce time; increase if the output 
 
 #define COLOR_NUM 5
 int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
+
+// Must use the "packed" attribute to make sure the compiler doesn't add any padding to deal with
+// word alignment.
+typedef struct {
+  uint16_t vendorID;                    // vendor ID
+  uint8_t beaconType;                   // Should be 0x10 (Product Advertisement) for the packets we want
+  uint8_t unknownData1[3];              // Unknown data
+  uint8_t victronRecordType;            // Should be 0x01 (Solar Charger) for the packets we want
+  uint16_t nonceDataCounter;            // Nonce
+  uint8_t encryptKeyMatch;              // Should match pre-shared encryption key byte 0
+  uint8_t victronEncryptedData[21];     // (31 bytes max per BLE spec - size of previous elements)
+  uint8_t nullPad;                      // extra byte because toCharArray() adds a \0 byte.
+} __attribute__((packed)) victronManufacturerData;
+
+typedef struct {
+   uint8_t deviceState;
+   uint8_t outputState;
+   uint8_t errorCode;
+   uint16_t alarmReason;
+   uint16_t warningReason;
+   uint16_t inputVoltage;
+   uint16_t outputVoltage;
+   uint32_t offReason;
+   uint8_t  unused[32];                  // Not currently used by Victron, but it could be in the future.
+} __attribute__((packed)) victronPanelData;
+
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+    void onResult(BLEAdvertisedDevice advertisedDevice) {
+
+
+      #define manDataSizeMax 31
+
+
+      // See if we have manufacturer data and then look to see if it's coming from a Victron device.
+      if (advertisedDevice.haveManufacturerData() == true) {
+
+        uint8_t manCharBuf[manDataSizeMax+1];
+
+        #ifdef USE_String
+          String manData = advertisedDevice.getManufacturerData().c_str();  ;      // lib code returns String.
+        #else
+          std::string manData = advertisedDevice.getManufacturerData(); // lib code returns std::string
+        #endif
+        int manDataSize=manData.length(); // This does not count the null at the end.
+
+        // Copy the data from the String to a byte array. Must have the +1 so we
+        // don't lose the last character to the null terminator.
+        #ifdef USE_String
+          manData.toCharArray((char *)manCharBuf,manDataSize+1);
+        #else
+          manData.copy((char *)manCharBuf, manDataSize+1);
+        #endif
+
+        // Now let's setup a pointer to a struct to get to the data more cleanly.
+        victronManufacturerData * vicData=(victronManufacturerData *)manCharBuf;
+
+        // ignore this packet if the Vendor ID isn't Victron.
+        if (vicData->vendorID!=0x02e1) {
+          return;
+        } 
+
+        // ignore this packet if it isn't type 0x01 (Solar Charger).
+        if (vicData->victronRecordType != 0x09) {
+          Serial.printf("Packet victronRecordType was 0x%x doesn't match 0x09\n",
+               vicData->victronRecordType);
+          return;
+        }
+
+        // Not all packets contain a device name, so if we get one we'll save it and use it from now on.
+        if (advertisedDevice.haveName()) {
+          // This works the same whether getName() returns String or std::string.
+          strcpy(savedDeviceName,advertisedDevice.getName().c_str());
+        }
+        
+        if (vicData->encryptKeyMatch != key[0]) {
+          Serial.printf("Packet encryption key byte 0x%2.2x doesn't match configured key[0] byte 0x%2.2x\n",
+              vicData->encryptKeyMatch, key[0]);
+          return;
+        }
+
+        uint8_t inputData[16];
+        uint8_t outputData[16]={0};  // i don't really need to initialize the output.
+
+        // The number of encrypted bytes is given by the number of bytes in the manufacturer
+        // data as a whole minus the number of bytes (10) in the header part of the data.
+        int encrDataSize=manDataSize-10;
+        for (int i=0; i<encrDataSize; i++) {
+          inputData[i]=vicData->victronEncryptedData[i];   // copy for our decrypt below while I figure this out.
+        }
+
+        esp_aes_context ctx;
+        esp_aes_init(&ctx);
+
+        auto status = esp_aes_setkey(&ctx, key, keyBits);
+        if (status != 0) {
+          Serial.printf("  Error during esp_aes_setkey operation (%i).\n",status);
+          esp_aes_free(&ctx);
+          return;
+        }
+        
+        // construct the 16-byte nonce counter array by piecing it together byte-by-byte.
+        uint8_t data_counter_lsb=(vicData->nonceDataCounter) & 0xff;
+        uint8_t data_counter_msb=((vicData->nonceDataCounter) >> 8) & 0xff;
+        u_int8_t nonce_counter[16] = {data_counter_lsb, data_counter_msb, 0};
+        
+        u_int8_t stream_block[16] = {0};
+
+        size_t nonce_offset=0;
+        status = esp_aes_crypt_ctr(&ctx, encrDataSize, &nonce_offset, nonce_counter, stream_block, inputData, outputData);
+        if (status != 0) {
+          Serial.printf("Error during esp_aes_crypt_ctr operation (%i).",status);
+          esp_aes_free(&ctx);
+          return;
+        }
+        esp_aes_free(&ctx);
+
+        // Now do our same struct magic so we can get to the data more easily.
+        victronPanelData * victronData = (victronPanelData *) outputData;
+
+        // Getting to these elements is easier using the struct instead of
+        // hacking around with outputData[x] references.
+        uint8_t deviceState=victronData->deviceState;
+        uint8_t outputState=victronData->outputState;
+        uint8_t errorCode=victronData->errorCode;
+        uint16_t alarmReason=victronData->alarmReason;
+        uint16_t warningReason=victronData->warningReason;
+        float inputVoltage=float(victronData->inputVoltage)*0.01;
+        float outputVoltage=float(victronData->outputVoltage)*0.01;
+        uint32_t offReason=victronData->offReason;
+
+
+        Serial.printf("%-31s, Battery: %6.2f Volts, Load: %6.2f Volts, Alarm Reason: %6d, Device State: %6d, Error Code: %6d, Warning Reason: %6d, Off Reason: %6d\n",
+          savedDeviceName,
+          inputVoltage, outputVoltage,
+          alarmReason, deviceState,
+          errorCode, warningReason,
+          offReason
+        );
+      }
+    }
+};
 
 void flashErase() {
   nvs_flash_erase(); // erase the NVS partition and...
@@ -517,9 +668,16 @@ void setup()
     //flashErase();
     Serial.begin(115200); /* prepare for possible serial debug */
 
-    delay(5000);
+    delay(1800); // sit here for a bit to give USB Serial a chance to enumerate
 
-    WiFi.mode(WIFI_STA);
+    Serial.printf("Using encryption key: ");
+    for (int i=0; i<16; i++) {
+      Serial.printf(" %2.2x",key[i]);
+    }
+
+    Serial.println();
+
+    strcpy(savedDeviceName,"(unknown device name)");
 
     preferences.begin("ae", true);
     wifiSetToOn = preferences.getBool("p_wifiOn");
@@ -534,6 +692,7 @@ void setup()
 
     if ((SSID != "none") && (PWD != "none"))
     {
+      WiFi.mode(WIFI_STA);
       WiFi.begin(SSID, PWD);
     }    
 
@@ -572,6 +731,15 @@ void setup()
 
     updateWiFiState();
 
+    // Code from Examples->BLE->Beacon_Scanner. This sets up a timed scan watching for BLE beacons.
+    // During a scan the receipt of a beacon will trigger a call to MyAdvertisedDeviceCallbacks().
+    BLEDevice::init("");
+    pBLEScan = BLEDevice::getScan(); //create new scan
+    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+    pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
+    pBLEScan->setInterval(1000);
+    pBLEScan->setWindow(99); // less or equal setInterval value
+
     Serial.println("AE 52mm Gauge: Operational!");
 
     xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 3, NULL, 0);
@@ -580,5 +748,6 @@ void setup()
 
 void loop()
 {
-
+  BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
+  pBLEScan->clearResults(); // delete results fromBLEScan buffer to release memory
 }

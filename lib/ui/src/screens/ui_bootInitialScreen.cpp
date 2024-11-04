@@ -95,13 +95,13 @@ lv_obj_set_x( ui_SSIDInputText, 0 );
 lv_obj_set_y( ui_SSIDInputText, -58 );
 lv_obj_set_align( ui_SSIDInputText, LV_ALIGN_CENTER );
 lv_textarea_set_max_length(ui_SSIDInputText,64);
-if (SSID == "none")
+if (SSID != "none")
 {
-    lv_textarea_set_placeholder_text(ui_SSIDInputText,SSID.c_str());
+    lv_textarea_set_text(ui_SSIDInputText,SSID.c_str()); 
 }
 else
 {
-    lv_textarea_set_placeholder_text(ui_SSIDInputText,"Enter SSID Name...");
+    lv_textarea_set_text(ui_SSIDInputText,"Enter SSID Name...");
 }
 lv_textarea_set_one_line(ui_SSIDInputText,true);
 lv_obj_add_flag( ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN );   /// Flags
@@ -138,14 +138,13 @@ lv_obj_set_x( ui_SSIDPasswordInputText, 0 );
 lv_obj_set_y( ui_SSIDPasswordInputText, 48 );
 lv_obj_set_align( ui_SSIDPasswordInputText, LV_ALIGN_CENTER );
 lv_textarea_set_max_length(ui_SSIDPasswordInputText,64);
-if (SSID == "none")
+if (PWD != "none")
 {
-    //lv_textarea_set_placeholder_text(ui_SSIDInputText, SSID);
-    lv_textarea_set_placeholder_text(ui_SSIDPasswordInputText,PWD.c_str());
+    lv_textarea_set_text(ui_SSIDPasswordInputText,PWD.c_str());
 }
 else
 {
-lv_textarea_set_placeholder_text(ui_SSIDPasswordInputText,"Enter SSID Password...");
+    lv_textarea_set_text(ui_SSIDPasswordInputText,"Enter SSID Password...");
 }
 lv_textarea_set_one_line(ui_SSIDPasswordInputText,true);
 lv_obj_add_flag( ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN );   /// Flags

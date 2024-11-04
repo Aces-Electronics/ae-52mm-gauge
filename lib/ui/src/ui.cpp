@@ -12,6 +12,11 @@ extern String PWD;
 extern bool disableWiFi;
 extern bool settingsState;
 
+bool SSIDField = false;
+bool SSIDPasswordField = false;
+extern bool SSIDUpdated;
+extern bool SSIDPasswordUpdated;
+
 ///////////////////// VARIABLES ////////////////////
 
 // SCREEN: ui_bootInitialScreen
@@ -107,11 +112,6 @@ const lv_img_dsc_t *ui_imgset_2041518705[1] = {&ui_img_1917549703};
 const lv_img_dsc_t *ui_imgset_737743436[1] = {&ui_img_539538216};
 const lv_img_dsc_t *ui_imgset_340495923[1] = {&ui_img_1749172309};
 const lv_img_dsc_t *ui_imgset_505348764[1] = {&ui_img_2105704960};
-
-bool SSIDField = false;
-bool SSIDPasswordField = false;
-extern bool SSIDUpdated;
-extern bool SSIDPasswordUpdated;
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
 #if LV_COLOR_DEPTH != 16
