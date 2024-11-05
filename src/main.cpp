@@ -221,8 +221,10 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
         float outputVoltage=float(victronData->outputVoltage)*0.01;
         uint32_t offReason=victronData->offReason;
 
+        //lv_textarea_set_text(ui_battVLabelSensor, %f, inputVoltage); 
+        lv_label_set_text_fmt(ui_battVLabelSensor,"%f",inputVoltage );
 
-        Serial.printf("%-31s, Battery: %6.2f Volts, Load: %6.2f Volts, Alarm Reason: %6d, Device State: %6d, Error Code: %6d, Warning Reason: %6d, Off Reason: %6d\n",
+        Serial.printf("%s, Battery: %.2f Volts, Load: %4.2f Volts, Alarm Reason: %d, Device State: %d, Error Code: %d, Warning Reason: %d, Off Reason: %d\n",
           savedDeviceName,
           inputVoltage, outputVoltage,
           alarmReason, deviceState,
