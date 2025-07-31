@@ -418,6 +418,7 @@ void Task_TFT(void *pvParameters)
     {
       screen_index = new_screen_index;
 
+
       // Perform screen change here, safely inside LVGL task
       switch (screen_index) 
       {
@@ -469,10 +470,6 @@ void Task_TFT(void *pvParameters)
         if ((bezel_left) && (enable_ui_turboExhaustScreen))
         {
           _ui_screen_change(ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
-        }
-        else
-        {
-          _ui_screen_change(ui_bootInitialScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
         }
         Serial.println("Displaying: EGR/Turbo Screen");
         break;
@@ -627,7 +624,7 @@ void setup()
   }
 
   // Register for a callback function that will be called when data is received
-  esp_now_register_recv_cb(OnDataRecv);
+  //esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
 
   String LVGL_Arduino = "Hello from an AE 52mm Gauge using LVGL: ";
   LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();

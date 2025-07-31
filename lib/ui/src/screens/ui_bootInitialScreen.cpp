@@ -210,9 +210,9 @@ lv_obj_set_style_pad_top(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAUL
 lv_obj_set_style_pad_bottom(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_aeLandingBottomLabel = lv_label_create(ui_bootInitialScreen);
-lv_obj_set_width( ui_aeLandingBottomLabel, 199);
+lv_obj_set_width( ui_aeLandingBottomLabel, 250);
 lv_obj_set_height( ui_aeLandingBottomLabel, 25);
-lv_obj_set_x( ui_aeLandingBottomLabel, 6 );
+lv_obj_set_x( ui_aeLandingBottomLabel, 0 );
 lv_obj_set_y( ui_aeLandingBottomLabel, 140 );
 lv_obj_set_align( ui_aeLandingBottomLabel, LV_ALIGN_CENTER );
 lv_label_set_long_mode(ui_aeLandingBottomLabel,LV_LABEL_LONG_SCROLL_CIRCULAR);

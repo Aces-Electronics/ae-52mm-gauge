@@ -8,7 +8,7 @@
 #include <aes/esp_aes.h>
 
 struct struct_message_voltage0;
-
+extern bool enable_ui_batteryScreen;
 
 typedef struct {
   uint16_t vendorID;
@@ -42,9 +42,6 @@ public:
     void onResult(BLEAdvertisedDevice* advertisedDevice) override;
 
 private:
-    char convertCharToHex(char ch);
-    void prtnib(int n);
-
     char savedDeviceName[32];
     int keyBits = 128;
 
