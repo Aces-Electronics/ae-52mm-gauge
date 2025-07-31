@@ -210,23 +210,19 @@ lv_obj_set_style_pad_top(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAUL
 lv_obj_set_style_pad_bottom(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_aeLandingBottomLabel = lv_label_create(ui_bootInitialScreen);
-lv_obj_set_width( ui_aeLandingBottomLabel, 250);
+lv_obj_set_width( ui_aeLandingBottomLabel, 325);
 lv_obj_set_height( ui_aeLandingBottomLabel, 25);
 lv_obj_set_x( ui_aeLandingBottomLabel, 0 );
 lv_obj_set_y( ui_aeLandingBottomLabel, 140 );
 lv_obj_set_align( ui_aeLandingBottomLabel, LV_ALIGN_CENTER );
 lv_label_set_long_mode(ui_aeLandingBottomLabel,LV_LABEL_LONG_SCROLL_CIRCULAR);
-lv_label_set_text(ui_aeLandingBottomLabel,"Waiting for AE-Mesh data...");
+lv_label_set_text(ui_aeLandingBottomLabel,"Waiting for sensor data...");
 lv_obj_set_style_text_color(ui_aeLandingBottomLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_aeLandingBottomLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_align(ui_aeLandingBottomLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_aeLandingBottomLabel, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_bg_color(ui_aeLandingBottomLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_left(ui_aeLandingBottomLabel, 30, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_right(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_top(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_bottom(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_aeLandingBottomIcon = lv_img_create(ui_bootInitialScreen);
 lv_img_set_src(ui_aeLandingBottomIcon, &ui_img_1917549703);

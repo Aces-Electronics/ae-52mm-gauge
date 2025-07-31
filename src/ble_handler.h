@@ -38,7 +38,6 @@ public:
     BLEHandler(struct_message_voltage0* voltageStruct);
     void startScan(int scanTimeSeconds);
     void stopScan();
-
     void onResult(BLEAdvertisedDevice* advertisedDevice) override;
 
 private:

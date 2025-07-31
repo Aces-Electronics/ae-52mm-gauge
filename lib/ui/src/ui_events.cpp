@@ -97,18 +97,11 @@ void landingBackButtonPressedFunction(lv_event_t * e)
 		lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
 
-		if (validLocation) 
-		{	
-			lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-        	lv_obj_clear_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
-		}
-		else
-		{
-			lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-        	lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
-		}
+
+		lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+
 		
- 
 		lv_img_set_src(ui_settingsIcon, &ui_img_501072417); // settings Icon
 		lv_img_set_src(ui_aeLandingIcon, &ui_img_ae_white_128_png); // AE Landing Icon
 
