@@ -3149,9 +3149,14 @@
                   },
                   {
                     "nid": 113968246,
-                    "flags": 1048576,
                     "strtype": "OBJECT/Flags",
                     "InheritedType": 1
+                  },
+                  {
+                    "nid": 100,
+                    "strtype": "OBJECT/Hidden",
+                    "strval": "True",
+                    "InheritedType": 2
                   },
                   {
                     "nid": -1880546699,
@@ -3288,18 +3293,18 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  6,
+                  0,
                   140
                 ],
                 "InheritedType": 7
               },
               {
                 "nid": 748884510,
-                "flags": 17,
+                "flags": 49,
                 "strtype": "OBJECT/Size",
                 "intarray": [
-                  280,
-                  64
+                  320,
+                  1
                 ],
                 "InheritedType": 7
               },
@@ -3311,19 +3316,11 @@
               },
               {
                 "nid": -2127190451,
-                "flags": 1048576,
                 "strtype": "OBJECT/Flags",
                 "InheritedType": 1
               },
               {
-                "nid": -1372152610,
-                "strtype": "OBJECT/Clickable",
-                "strval": "False",
-                "InheritedType": 2
-              },
-              {
                 "nid": 225,
-                "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
                 "InheritedType": 1
               },
@@ -3365,13 +3362,13 @@
               {
                 "nid": 2067096902,
                 "strtype": "LABEL/Long_mode",
-                "strval": "WRAP",
+                "strval": "SCROLL_CIRCULAR",
                 "InheritedType": 3
               },
               {
                 "nid": 193262503,
                 "strtype": "LABEL/Text",
-                "strval": "NO LOCATION",
+                "strval": "AE: looking for sensors to connect to...",
                 "InheritedType": 10
               },
               {
@@ -3396,7 +3393,7 @@
                       {
                         "nid": -2067251452,
                         "strtype": "_style/Text_Align",
-                        "strval": "CENTER",
+                        "strval": "AUTO",
                         "InheritedType": 3
                       },
                       {
@@ -12424,11 +12421,11 @@
     "uiExportFolderPath": "/Users/acea/Library/Mobile Documents/com~apple~CloudDocs/Ace's Electronics/projects/ae-52mm-gauge/lib/ui/src",
     "projectExportFolderPath": "/Users/acea/Library/Mobile Documents/com~apple~CloudDocs/Ace's Electronics/projects/ae-52mm-gauge/lib/ui",
     "custom_variable_prefix": "uic",
-    "backup_cnt": 1574,
+    "backup_cnt": 1590,
     "autosave_cnt": 0,
     "group_color_cnt": 0,
     "lvgl_version": "8.3.6",
-    "callfuncsexport": "CPP_FILE",
+    "callfuncsexport": "DONT_EXPORT",
     "imageexport": "SOURCE",
     "lvgl_include_path": "",
     "drive_stdio": "-",

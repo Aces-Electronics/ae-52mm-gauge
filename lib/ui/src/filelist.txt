@@ -6,7 +6,7 @@ screens/ui_turboExhaustScreen.c
 ui.c
 components/ui_comp_hook.c
 ui_helpers.c
-ui_events.cpp
+ui_events.c
 images/ui_img_807091229.c
 images/ui_img_501072417.c
 images/ui_img_ae_white_128_png.c

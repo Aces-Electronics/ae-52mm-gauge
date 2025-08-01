@@ -12,13 +12,14 @@
 #include "touch.h"
 #include "passwords.h"
 #include "ble_handler.h"
+#include "encoder.h"
 
 // #define USE_String
 
 String SSID_cpp = "MySSID";
 String PWD_cpp = "MyPassword";
-const char* SSID_c = nullptr;
-const char* PWD_c = nullptr;
+const char *SSID_c = nullptr;
+const char *PWD_c = nullptr;
 
 #define I2C_SDA_PIN 17
 #define I2C_SCL_PIN 18
@@ -30,6 +31,10 @@ const char* PWD_c = nullptr;
 #define ENCODER_CLK 13 // CLK
 #define ENCODER_DT 10  // DT
 
+#define CLK 13
+#define DT 10
+#define SW 14
+
 /*Change to your screen resolution*/
 static const uint16_t screenWidth = 480;
 static const uint16_t screenHeight = 480;
@@ -39,6 +44,8 @@ volatile int new_screen_index = 0;
 
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * screenHeight / 5];
+
+Encoder e(CLK, DT, SW);
 
 uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -82,11 +89,8 @@ bool enable_ui_turboExhaustScreen = false;
 unsigned long startTime = 0;
 bool timerRunning = false;
 
+int count = 0;
 int counter = 0;
-int State;
-int old_State;
-int move_flag = 0;
-int button_flag = 0;
 int flesh_flag = 1;
 int screen_index = 1; // 1: battery screen
 int wifi_flag = 0;
@@ -119,9 +123,10 @@ struct_message_voltage0 remoteVoltage0Struct;
 BLEHandler bleHandler(&localVoltage0Struct);
 esp_now_peer_info_t peerInfo;
 
-void update_c_strings() {
-    SSID_c = SSID_cpp.c_str();
-    PWD_c = PWD_cpp.c_str();
+void update_c_strings()
+{
+  SSID_c = SSID_cpp.c_str();
+  PWD_c = PWD_cpp.c_str();
 }
 
 // Callback when data is received
@@ -129,6 +134,9 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
 
   uint8_t type = incomingData[0];
+
+  Serial.print("Case: ");
+  Serial.println(type);
 
   switch (type)
   {
@@ -205,40 +213,10 @@ void flashErase()
     ;
 }
 
-void encoder_irq()
-{
-  if ((millis() - lastDebounceTime) > debounceDelay)
-  {
-    State = digitalRead(ENCODER_CLK);
-    Serial.println(State);
-    if (State != old_State)
-    {
-      if (digitalRead(ENCODER_DT) == State)
-      {
-        bezel_right = true;
-        bezel_left = false;
-      }
-      else
-      {
-        bezel_left = true;
-        bezel_right = false;
-      }
-    }
-    old_State = State; // the first position was changed
-  }
-  lastDebounceTime = millis(); // Reset the debouncing timer
-}
-
 void pin_init()
 {
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
-
-  pinMode(ENCODER_CLK, INPUT_PULLUP);
-  pinMode(ENCODER_DT, INPUT_PULLUP);
-  old_State = digitalRead(ENCODER_CLK);
-
-  attachInterrupt(ENCODER_CLK, encoder_irq, CHANGE);
 
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
 }
@@ -426,68 +404,121 @@ void Task_TFT(void *pvParameters)
 
     if (screen_change_requested)
     {
+      screen_change_requested = false;
+      if (count > 1)
+        new_screen_index = 1;
+      if (count < 0)
+        new_screen_index = 0;
       screen_index = new_screen_index;
-
+      Serial.print("Screen change case: ");
+      Serial.println(screen_index);
+      lv_obj_t *current_screen = lv_scr_act(); // get active screen
 
       // Perform screen change here, safely inside LVGL task
-      switch (screen_index) 
+      switch (screen_index)
       {
       case 0: // ui_bootInitialScreen
+        if (current_screen == ui_bootInitialScreen)
+        {
+          break;
+        }
         if ((bezel_left) && (enable_ui_bootInitialScreen))
         {
-          _ui_screen_change(&ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          _ui_screen_change(&ui_bootInitialScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          Serial.println("Displaying: Boot Initial Screen");
+        }
+        else if ((bezel_right) && (enable_ui_bootInitialScreen))
+        {
+          _ui_screen_change(&ui_bootInitialScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+          Serial.println("Displaying: Boot Initial Screen");
         }
         else
         {
-          _ui_screen_change(&ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+          Serial.println("Can't display Screen, not enabled");
         }
-        Serial.println("Displaying: Boot Initial Screen");
+
         break;
-      case 1: //ui_batteryScreen
+      case 1: // ui_batteryScreen
+        if (current_screen == ui_batteryScreen)
+        {
+          break;
+        }
         if ((bezel_left) && (enable_ui_batteryScreen))
         {
-          _ui_screen_change(&ui_bootInitialScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          _ui_screen_change(&ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          Serial.println("Displaying: Battery Screen");
         }
-        else
+        else if ((bezel_right) && (enable_ui_batteryScreen))
         {
           _ui_screen_change(&ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+          Serial.println("Displaying: Battery Screen");
         }
-        Serial.println("Displaying: Battery Screen");
+        else
+        {
+          Serial.println("Can't display Screen, not enabled");
+        }
         break;
       case 2: // ui_oilScreen
+        if (current_screen == ui_oilScreen)
+        {
+          break;
+        }
         if ((bezel_left) && (enable_ui_oilScreen))
         {
-          _ui_screen_change(&ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          _ui_screen_change(&ui_oilScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          Serial.println("Displaying: Oil Screen");
+        }
+        else if ((bezel_right) && (enable_ui_oilScreen))
+        {
+          _ui_screen_change(&ui_oilScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+          Serial.println("Displaying: Oil Screen");
         }
         else
         {
-          _ui_screen_change(&ui_coolantScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+          Serial.println("Can't display Screen, not enabled");
         }
-        Serial.println("Displaying: Oil Screen");
         break;
       case 3: // ui_coolantScreen
+        if (current_screen == ui_coolantScreen)
+        {
+          break;
+        }
         if ((bezel_left) && (enable_ui_coolantScreen))
         {
-          _ui_screen_change(&ui_oilScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          _ui_screen_change(&ui_coolantScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          Serial.println("Displaying: Coolant Screen");
+        }
+        else if ((bezel_right) && (enable_ui_coolantScreen))
+        {
+          _ui_screen_change(&ui_coolantScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+          Serial.println("Displaying: Coolant Screen");
         }
         else
         {
-          _ui_screen_change(&ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+          Serial.println("Can't display Screen, not enabled");
         }
-        Serial.println("Displaying: Coolant Screen");
         break;
       case 4: // ui_turboExhaustScreen
+        if (current_screen == ui_turboExhaustScreen)
+        {
+          break;
+        }
         if ((bezel_left) && (enable_ui_turboExhaustScreen))
         {
           _ui_screen_change(&ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+          Serial.println("Displaying: EGR/Turbo Screen");
         }
-        Serial.println("Displaying: EGR/Turbo Screen");
+        else if ((bezel_right) && (enable_ui_turboExhaustScreen))
+        {
+          _ui_screen_change(&ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+          Serial.println("Displaying: EGR/Turbo Screen");
+        }
+        else
+        {
+          Serial.println("Can't display Screen, not enabled");
+        }
         break;
       }
-      bezel_left = false;
-      bezel_right = false;
-
-      screen_change_requested = false;
     }
     vTaskDelay(10);
   }
@@ -497,33 +528,6 @@ void Task_main(void *pvParameters)
 {
   while (1)
   {
-    if ((digitalRead(BUTTON_PIN) == 0) || (bezel_left) || (bezel_right))
-    {
-      if (bezel_left)
-      {
-        new_screen_index = screen_index + 1;
-        Serial.println("Bezel rotating: left (down)");
-      }
-      else if (bezel_right)
-      {
-        new_screen_index = screen_index - 1;
-        Serial.println("Bezel rotating: right (up)");
-      }
-
-      if (new_screen_index > 4)
-        new_screen_index = 0;
-      if (new_screen_index < 0)
-        new_screen_index = 4;
-
-      screen_change_requested = true;
-
-      while (digitalRead(BUTTON_PIN) == 0)
-      {
-        vTaskDelay(100);
-      }
-      vTaskDelay(50);
-    }
-
     if (syncFlash)
     {
       if (!wifiSetToOn)
@@ -634,7 +638,7 @@ void setup()
   }
 
   // Register for a callback function that will be called when data is received
-  //esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
+  // esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
 
   String LVGL_Arduino = "Hello from an AE 52mm Gauge using LVGL: ";
   LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
@@ -689,7 +693,40 @@ void loop()
   if (timerRunning && (millis() - startTime >= 10000))
   {
     // 10 seconds have elapsed, do something here
+    count = 0; // reset the encoder counter ater 10 seconds
     bleHandler.startScan(5);
     timerRunning = false; // Reset timer if you want to run again
+  }
+
+  switch (e.read())
+  {
+  case NOTHING:
+    break;
+
+  case SINGLE_PRESS:
+    Serial.println("Single Pressed");
+    count++;
+    screen_change_requested = true;
+    break;
+
+  case LONG_PRESS:
+    Serial.println("Long Pressed");
+    break;
+
+  case ENC_CW:
+    count++;
+    Serial.println("Encoder Clockwise " + String(count));
+    bezel_right = true;
+    bezel_left = false;
+    screen_change_requested = true;
+    break;
+
+  case ENC_CCW:
+    count--;
+    Serial.println("Encoder CounterClockwise " + String(count));
+    bezel_left = true;
+    bezel_right = false;
+    screen_change_requested = true;
+    break;
   }
 }
