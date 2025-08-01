@@ -8,6 +8,148 @@
 BLEScan *pBLEScan;
 BLEUtils utils;
 
+#include <map>
+#include <string>
+
+// Helper function to convert Device State code to string
+const char* deviceStateToString(uint8_t state) {
+    switch (state) {
+        case 0: return "OFF";
+        case 1: return "LOW_POWER";
+        case 2: return "FAULT";
+        case 3: return "BULK";
+        case 4: return "ABSORPTION";
+        case 5: return "FLOAT";
+        case 6: return "STORAGE";
+        case 7: return "EQUALIZE_MANUAL";
+        case 9: return "INVERTING";
+        case 11: return "POWER_SUPPLY";
+        case 245: return "STARTING_UP";
+        case 246: return "REPEATED_ABSORPTION";
+        case 247: return "RECONDITION";
+        case 248: return "BATTERY_SAFE";
+        case 249: return "ACTIVE";
+        case 252: return "EXTERNAL_CONTROL";
+        case 255: return "NOT_AVAILABLE";
+        default: return "UNKNOWN_STATE";
+    }
+}
+
+// Helper function to convert Error Code to string
+const char* errorCodeToString(uint8_t code) {
+    switch (code) {
+        case 0: return "NO_ERROR";
+        case 1: return "TEMPERATURE_BATTERY_HIGH";
+        case 2: return "VOLTAGE_HIGH";
+        case 3: return "REMOTE_TEMPERATURE_A";
+        case 4: return "REMOTE_TEMPERATURE_B";
+        case 5: return "REMOTE_TEMPERATURE_C";
+        case 6: return "REMOTE_BATTERY_A";
+        case 7: return "REMOTE_BATTERY_B";
+        case 8: return "REMOTE_BATTERY_C";
+        case 11: return "HIGH_RIPPLE";
+        case 14: return "TEMPERATURE_BATTERY_LOW";
+        case 17: return "TEMPERATURE_CHARGER";
+        case 18: return "OVER_CURRENT";
+        case 20: return "BULK_TIME";
+        case 21: return "CURRENT_SENSOR";
+        case 22: return "INTERNAL_TEMPERATURE_A";
+        case 23: return "INTERNAL_TEMPERATURE_B";
+        case 24: return "FAN";
+        case 26: return "OVERHEATED";
+        case 27: return "SHORT_CIRCUIT";
+        case 28: return "CONVERTER_ISSUE";
+        case 29: return "OVER_CHARGE";
+        case 33: return "INPUT_VOLTAGE";
+        case 34: return "INPUT_CURRENT";
+        case 35: return "INPUT_POWER";
+        case 38: return "INPUT_SHUTDOWN_VOLTAGE";
+        case 39: return "INPUT_SHUTDOWN_CURRENT";
+        case 40: return "INPUT_SHUTDOWN_FAILURE";
+        case 41: return "INVERTER_SHUTDOWN_41";
+        case 42: return "INVERTER_SHUTDOWN_42";
+        case 43: return "INVERTER_SHUTDOWN_43";
+        case 50: return "INVERTER_OVERLOAD";
+        case 51: return "INVERTER_TEMPERATURE";
+        case 52: return "INVERTER_PEAK_CURRENT";
+        case 53: return "INVERTER_OUPUT_VOLTAGE_A";
+        case 54: return "INVERTER_OUPUT_VOLTAGE_B";
+        case 55: return "INVERTER_SELF_TEST_A";
+        case 56: return "INVERTER_SELF_TEST_B";
+        case 57: return "INVERTER_AC";
+        case 58: return "INVERTER_SELF_TEST_C";
+        case 65: return "COMMUNICATION";
+        case 66: return "SYNCHRONISATION";
+        case 67: return "BMS";
+        case 68: return "NETWORK_A";
+        case 69: return "NETWORK_B";
+        case 70: return "NETWORK_C";
+        case 71: return "NETWORK_D";
+        case 80: return "PV_INPUT_SHUTDOWN_80";
+        case 81: return "PV_INPUT_SHUTDOWN_81";
+        case 82: return "PV_INPUT_SHUTDOWN_82";
+        case 83: return "PV_INPUT_SHUTDOWN_83";
+        case 84: return "PV_INPUT_SHUTDOWN_84";
+        case 85: return "PV_INPUT_SHUTDOWN_85";
+        case 86: return "PV_INPUT_SHUTDOWN_86";
+        case 87: return "PV_INPUT_SHUTDOWN_87";
+        case 114: return "CPU_TEMPERATURE";
+        case 116: return "CALIBRATION_LOST";
+        case 117: return "FIRMWARE";
+        case 119: return "SETTINGS";
+        case 121: return "TESTER_FAIL";
+        case 200: return "INTERNAL_DC_VOLTAGE_A";
+        case 201: return "INTERNAL_DC_VOLTAGE_B";
+        case 202: return "SELF_TEST";
+        case 203: return "INTERNAL_SUPPLY_A";
+        case 205: return "INTERNAL_SUPPLY_B";
+        case 212: return "INTERNAL_SUPPLY_C";
+        case 215: return "INTERNAL_SUPPLY_D";
+        default: return "UNKNOWN_ERROR_CODE";
+    }
+}
+
+// Helper function to convert Alarm Reason bitfield to string
+String alarmReasonToString(uint16_t alarm) {
+    if (alarm == 0) return "NO_ALARM";
+    String result = "";
+    if (alarm & 1) result += "LOW_VOLTAGE, ";
+    if (alarm & 2) result += "HIGH_VOLTAGE, ";
+    if (alarm & 4) result += "LOW_SOC, ";
+    if (alarm & 8) result += "LOW_STARTER_VOLTAGE, ";
+    if (alarm & 16) result += "HIGH_STARTER_VOLTAGE, ";
+    if (alarm & 32) result += "LOW_TEMPERATURE, ";
+    if (alarm & 64) result += "HIGH_TEMPERATURE, ";
+    if (alarm & 128) result += "MID_VOLTAGE, ";
+    if (alarm & 256) result += "OVERLOAD, ";
+    if (alarm & 512) result += "DC_RIPPLE, ";
+    if (alarm & 1024) result += "LOW_V_AC_OUT, ";
+    if (alarm & 2048) result += "HIGH_V_AC_OUT, ";
+    if (alarm & 4096) result += "SHORT_CIRCUIT, ";
+    if (alarm & 8192) result += "BMS_LOCKOUT, ";
+    // Remove trailing comma and space
+    if (result.length() > 2) result.remove(result.length() - 2);
+    return result;
+}
+
+// Helper function to convert Off Reason bitfield to string
+String offReasonToString(uint32_t offReason) {
+    if (offReason == 0) return "NO_REASON";
+    String result = "";
+    if (offReason & 0x00000001) result += "NO_INPUT_POWER, ";
+    if (offReason & 0x00000002) result += "SWITCHED_OFF_SWITCH, ";
+    if (offReason & 0x00000004) result += "SWITCHED_OFF_REGISTER, ";
+    if (offReason & 0x00000008) result += "REMOTE_INPUT, ";
+    if (offReason & 0x00000010) result += "PROTECTION_ACTIVE, ";
+    if (offReason & 0x00000020) result += "PAY_AS_YOU_GO_OUT_OF_CREDIT, ";
+    if (offReason & 0x00000040) result += "BMS, ";
+    if (offReason & 0x00000080) result += "ENGINE_SHUTDOWN, ";
+    if (offReason & 0x00000100) result += "ANALYSING_INPUT_VOLTAGE, ";
+    // Remove trailing comma and space
+    if (result.length() > 2) result.remove(result.length() - 2);
+    return result;
+}
+
 BLEHandler::BLEHandler(struct_message_voltage0 *voltageStruct)
 {
     // Store the pointer or copy data as needed
@@ -167,11 +309,18 @@ void BLEHandler::onResult(BLEAdvertisedDevice *advertisedDevice)
         lv_arc_set_value(ui_SBattVArc, inputVoltage * 10); // * 10 to allow for the arc to deal with floats
         
 
-        Serial.printf("%s, Battery: %.2f Volts, Load: %4.2f Volts, Alarm Reason: %d, Device State: %d, Error Code: %d, Warning Reason: %d, Off Reason: %d\n",
-                      savedDeviceName,
-                      inputVoltage, outputVoltage,
-                      alarmReason, deviceState,
-                      errorCode, warningReason,
-                      offReason);
+        Serial.printf("%s, Battery: %.2f Volts, Load: %.2f Volts\n"
+              "Alarm Reason: %s\n"
+              "Device State: %s\n"
+              "Error Code: %s\n"
+              "Warning Reason: %d\n"
+              "Off Reason: %s\n",
+              savedDeviceName,
+              inputVoltage, outputVoltage,
+              alarmReasonToString(alarmReason).c_str(),
+              deviceStateToString(deviceState),
+              errorCodeToString(errorCode),
+              warningReason,  // You can add a similar parser for warnings if you want
+              offReasonToString(offReason).c_str());
     }
 }
