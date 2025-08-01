@@ -9,6 +9,9 @@
 
 struct struct_message_voltage0;
 extern bool enable_ui_batteryScreen;
+extern bool screen_change_requested;
+extern int screen_index;
+extern bool bezel_right;
 
 typedef struct {
   uint16_t vendorID;
