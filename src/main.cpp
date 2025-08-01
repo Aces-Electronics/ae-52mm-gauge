@@ -15,6 +15,11 @@
 
 // #define USE_String
 
+String SSID_cpp = "MySSID";
+String PWD_cpp = "MyPassword";
+const char* SSID_c = nullptr;
+const char* PWD_c = nullptr;
+
 #define I2C_SDA_PIN 17
 #define I2C_SCL_PIN 18
 #define TOUCH_RST -1 // 38
@@ -113,6 +118,11 @@ struct_message_voltage0 remoteVoltage0Struct;
 
 BLEHandler bleHandler(&localVoltage0Struct);
 esp_now_peer_info_t peerInfo;
+
+void update_c_strings() {
+    SSID_c = SSID_cpp.c_str();
+    PWD_c = PWD_cpp.c_str();
+}
 
 // Callback when data is received
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
@@ -425,51 +435,51 @@ void Task_TFT(void *pvParameters)
       case 0: // ui_bootInitialScreen
         if ((bezel_left) && (enable_ui_bootInitialScreen))
         {
-          _ui_screen_change(ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+          _ui_screen_change(&ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
         }
         else
         {
-          _ui_screen_change(ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
+          _ui_screen_change(&ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
         }
         Serial.println("Displaying: Boot Initial Screen");
         break;
       case 1: //ui_batteryScreen
         if ((bezel_left) && (enable_ui_batteryScreen))
         {
-          _ui_screen_change(ui_bootInitialScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+          _ui_screen_change(&ui_bootInitialScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
         }
         else
         {
-          _ui_screen_change(ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
+          _ui_screen_change(&ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
         }
         Serial.println("Displaying: Battery Screen");
         break;
       case 2: // ui_oilScreen
         if ((bezel_left) && (enable_ui_oilScreen))
         {
-          _ui_screen_change(ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+          _ui_screen_change(&ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
         }
         else
         {
-          _ui_screen_change(ui_coolantScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
+          _ui_screen_change(&ui_coolantScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
         }
         Serial.println("Displaying: Oil Screen");
         break;
       case 3: // ui_coolantScreen
         if ((bezel_left) && (enable_ui_coolantScreen))
         {
-          _ui_screen_change(ui_oilScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+          _ui_screen_change(&ui_oilScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
         }
         else
         {
-          _ui_screen_change(ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
+          _ui_screen_change(&ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
         }
         Serial.println("Displaying: Coolant Screen");
         break;
       case 4: // ui_turboExhaustScreen
         if ((bezel_left) && (enable_ui_turboExhaustScreen))
         {
-          _ui_screen_change(ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+          _ui_screen_change(&ui_turboExhaustScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
         }
         Serial.println("Displaying: EGR/Turbo Screen");
         break;

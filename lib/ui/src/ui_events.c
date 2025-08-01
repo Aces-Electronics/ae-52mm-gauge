@@ -5,47 +5,48 @@
 
 #include "ui.h"
 #include "Arduino.h"
+#include "../../src/shared_data.h"
+#include <string.h> // For strcmp
 
 extern bool wifiSetToOn;
-extern String SSID;
-extern String PWD;
 extern bool settingsState;
-extern bool syncFlash ;
+extern bool syncFlash;
 extern bool connectWiFi;
 extern bool validLocation;
 
-void toggleWiFi(lv_event_t * e)
+void toggleWiFi(lv_event_t *e)
 {
 	if (!settingsState) // on the landing page, AKA not in settings
 	{
 		LV_LOG_USER("CHECKING IF WIFI CAN BE TURNED ON");
-		if ((PWD == "none") || (wifiSetToOn))
+		if ((strcmp(PWD_c, "none") == 0) || wifiSetToOn)
 		{
 			lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
-			if (PWD == "none")
+			if (strcmp(PWD_c, "none") == 0)
 			{
 				LV_LOG_USER("WIFI NOT CONFIGURED");
 			}
 			LV_LOG_USER("WIFI SET TO OFF");
 			wifiSetToOn = false;
 			syncFlash = true;
-		}  
+		}
 		else
 		{
 			LV_LOG_USER("WIFI CONFIGURED AND ON");
 			wifiSetToOn = true;
 			connectWiFi = true;
 			lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
-			LV_LOG_USER(SSID.c_str());
-			LV_LOG_USER(PWD.c_str());
-			lv_label_set_text(ui_feedbackLabel,"");
+			LV_LOG_USER("%s", SSID_c);
+			LV_LOG_USER("%s", PWD_c);
+			lv_label_set_text(ui_feedbackLabel, "");
 			lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
 			syncFlash = true;
-		}	
+		}
 	}
 	else
 	{
-		LV_LOG_USER("WIFI SETTINGS PRESSED");;
+		LV_LOG_USER("WIFI SETTINGS PRESSED");
+		;
 
 		lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
@@ -57,32 +58,31 @@ void toggleWiFi(lv_event_t * e)
 		lv_obj_clear_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
 
-		lv_obj_set_y( ui_feedbackLabel, -170 );
+		lv_obj_set_y(ui_feedbackLabel, -170);
 		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "WiFi SETTINGS: ");
 	}
 }
 
-void settingsButtonPressedFunction(lv_event_t * e)
+void settingsButtonPressedFunction(lv_event_t *e)
 {
 	LV_LOG_USER("SETTINGS BUTTON PRESSED");
 	settingsState = true;
 	if (settingsState)
 	{
-		//lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
-		lv_img_set_src(ui_wifiIcon, &ui_img_943648365); // WiFi settings
+		// lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_img_set_src(ui_wifiIcon, &ui_img_943648365);		  // WiFi settings
 		lv_img_set_src(ui_aeLandingIcon, &ui_img_1749172309); // Gauge settings
-		lv_img_set_src(ui_settingsIcon, &ui_img_2022370193); // ESP now settings
+		lv_img_set_src(ui_settingsIcon, &ui_img_2022370193);  // ESP now settings
 
 		lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-      	lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
 
 		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "SETTINGS: ");
 		lv_obj_clear_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
 	}
-	
 }
 
-void landingBackButtonPressedFunction(lv_event_t * e)
+void landingBackButtonPressedFunction(lv_event_t *e)
 {
 	if (settingsState)
 	{
@@ -97,19 +97,17 @@ void landingBackButtonPressedFunction(lv_event_t * e)
 		lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
 
-
 		lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
 
-		
-		lv_img_set_src(ui_settingsIcon, &ui_img_501072417); // settings Icon
+		lv_img_set_src(ui_settingsIcon, &ui_img_501072417);			// settings Icon
 		lv_img_set_src(ui_aeLandingIcon, &ui_img_ae_white_128_png); // AE Landing Icon
 
-		lv_obj_set_y( ui_feedbackLabel, -125 );
-		lv_obj_set_y( ui_SSIDLabel, -90 );
-		lv_obj_set_y( ui_SSIDInputText, -58 );
-		lv_obj_set_y( ui_SSIDPasswordLabel, 15 );
-		lv_obj_set_y( ui_SSIDPasswordInputText, 48 );
+		lv_obj_set_y(ui_feedbackLabel, -125);
+		lv_obj_set_y(ui_SSIDLabel, -90);
+		lv_obj_set_y(ui_SSIDInputText, -58);
+		lv_obj_set_y(ui_SSIDPasswordLabel, 15);
+		lv_obj_set_y(ui_SSIDPasswordInputText, 48);
 
 		_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "");
 
@@ -125,7 +123,7 @@ void landingBackButtonPressedFunction(lv_event_t * e)
 	settingsState = false;
 }
 
-void aeLandingIconFunction(lv_event_t * e)
+void aeLandingIconFunction(lv_event_t *e)
 {
 	// Your code here
 }

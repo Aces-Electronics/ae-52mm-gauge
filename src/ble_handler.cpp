@@ -158,11 +158,12 @@ void BLEHandler::onResult(BLEAdvertisedDevice *advertisedDevice)
         lv_obj_t * current_screen = lv_scr_act(); //get active screen
         if(current_screen != ui_batteryScreen)
         {
-            _ui_screen_change(ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0);
+            _ui_screen_change(&ui_batteryScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
         } 
 
         lv_label_set_text_fmt(ui_battVLabelSensor, "%.2f", inputVoltage);
         lv_arc_set_value(ui_SBattVArc, inputVoltage * 100);
+        
 
         Serial.printf("%s, Battery: %.2f Volts, Load: %4.2f Volts, Alarm Reason: %d, Device State: %d, Error Code: %d, Warning Reason: %d, Off Reason: %d\n",
                       savedDeviceName,
