@@ -8,3 +8,4 @@ src/passwords.h
 src/ui/autosave/*
 ui/autosave/
 ui/backup/
+lib/mf_Lvgl.zip

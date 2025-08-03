@@ -165,6 +165,10 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 
   switch (type)
   {
+  case 1: // message ID 1, settings
+    Serial.println("Received settings data");
+    // Handle settings data here
+    break;  
   case 3: // message ID 3, voltage
     memcpy(&remoteVoltage0Struct, incomingData, sizeof(remoteVoltage0Struct));
     Serial.print("Bytes received: ");
@@ -635,11 +639,6 @@ void setup()
     return;
   }
 
-  // Register peer
-  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
-  peerInfo.channel = 0;
-  peerInfo.encrypt = false;
-
   // Add peer
   if (esp_now_add_peer(&peerInfo) != ESP_OK)
   {
@@ -648,7 +647,7 @@ void setup()
   }
 
   // Register for a callback function that will be called when data is received
-  // esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
+  //esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
 
   String LVGL_Arduino = "Hello from an AE 52mm Gauge using LVGL: ";
   LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
