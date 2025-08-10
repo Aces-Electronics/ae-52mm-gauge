@@ -9,12 +9,11 @@
 #include <Preferences.h>
 #include <aes/esp_aes.h> // AES library for decrypting the Victron manufacturer data.
 
+#include "shared_defs.h" // use the same definitions as the shunt
 #include "touch.h"
 #include "passwords.h"
 #include "ble_handler.h"
 #include "encoder.h"
-
-// #define USE_String
 
 String SSID_cpp = "MySSID";
 String PWD_cpp = "MyPassword";
@@ -106,19 +105,10 @@ unsigned long debounceDelay = 500;  // the debounce time; increase if the output
 #define COLOR_NUM 5
 int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 
-typedef struct struct_message_voltage0
-{ // Voltage message
-  int messageID = 3;
-  bool dataChanged = 0; // stores whether or not the data in the struct has changed
-  float frontMainBatt1V = -1;
-  float frontAuxBatt1V = -1;
-  float rearMainBatt1V = -1;
-  float rearAuxBatt1V = -1;
-  float frontMainBatt1I = -1;
-  float frontAuxBatt1I = -1;
-  float rearMainBatt1I = -1;
-  float rearAuxBatt1I = -1;
-} struct_message_voltage0;
+// Shared shunt storage and task-synchronisation flag
+volatile bool shuntUiUpdatePending = false;          // set by ESP-NOW callback, cleared in LVGL task
+struct_message_ae_smart_shunt_1 localAeShuntStruct;  // used by UI
+struct_message_ae_smart_shunt_1 remoteAeShuntStruct; // temp copy from incoming bytes
 
 struct_message_voltage0 localVoltage0Struct;
 struct_message_voltage0 remoteVoltage0Struct;
@@ -154,6 +144,52 @@ void toggleBacklightDim()
   }
 }
 
+// Async LVGL callback used to update UI from data received in ESP-NOW callback.
+// This will be executed in the LVGL thread context (safe).
+static void lv_update_shunt_ui_cb(void *user_data)
+{
+  struct_message_ae_smart_shunt_1 *p = (struct_message_ae_smart_shunt_1 *)user_data;
+  if (!p)
+    return;
+
+  // Use the same UI updates you used in Task_TFT, running here in LVGL context.
+  // lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+  // lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE-Shunt: %.2fV  %.2fA  %.2fW\nRun: %s",
+  //                       p->batteryVoltage,
+  //                       p->batteryCurrent,
+  //                       p->batteryPower,
+  //                       p->runFlatTime);
+
+  Serial.printf("Local Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
+    p->batteryVoltage,
+    p->batteryCurrent,
+    p->batteryPower,
+    p->batterySOC * 100.0f,
+    p->batteryCapacity,
+    p->runFlatTime);
+
+
+  lv_label_set_text_fmt(ui_battVLabelSensor, "%.2f", "13.00");
+  lv_arc_set_value(ui_SBattVArc, (int)(p->batteryVoltage * 10));
+
+  // If you have other labels, update them here:
+  // lv_label_set_text_fmt(ui_battILabelSensor, "%.2f A", p->batteryCurrent);
+  // lv_label_set_text_fmt(ui_battPowerLabel, "%.2f W", p->batteryPower);
+  // lv_label_set_text_fmt(ui_battSOCLabel, "%.0f%%", p->batterySOC * 100.0f);
+
+  enable_ui_batteryScreen = true;
+  lv_obj_t *current_screen = lv_scr_act();
+  if (current_screen != ui_batteryScreen)
+  {
+    screen_change_requested = true;
+    screen_index = 1; // battery screen index
+    bezel_right = true;
+  }
+
+  // Free the heap memory we allocated in the ESP-NOW callback
+  free(p);
+}
+
 // Callback when data is received
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
@@ -165,72 +201,41 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 
   switch (type)
   {
-  case 1: // message ID 1, settings
-    Serial.println("Received settings data");
-    // Handle settings data here
-    break;  
-  case 3: // message ID 3, voltage
-    memcpy(&remoteVoltage0Struct, incomingData, sizeof(remoteVoltage0Struct));
+  case 1: // message ID 1 - AE Smart Shunt
+  {
+    Serial.println("Received AE-Smart-Shunt data");
+
+    // Defensive copy: zero target and copy up to struct size
+    struct_message_ae_smart_shunt_1 tmp;
+    memset(&tmp, 0, sizeof(tmp));
+    size_t toCopy = len < (int)sizeof(tmp) ? len : sizeof(tmp);
+    memcpy(&tmp, incomingData, toCopy);
+    tmp.runFlatTime[sizeof(tmp.runFlatTime) - 1] = '\0'; // ensure NUL
+
+    // Debug
     Serial.print("Bytes received: ");
     Serial.println(len);
-    if (remoteVoltage0Struct.frontMainBatt1V != -1)
+    Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
+                  tmp.batteryVoltage,
+                  tmp.batteryCurrent,
+                  tmp.batteryPower,
+                  tmp.batterySOC * 100.0f,
+                  tmp.batteryCapacity,
+                  tmp.runFlatTime);
+
+    // Allocate a copy on the heap for the async callback.
+    struct_message_ae_smart_shunt_1 *p = (struct_message_ae_smart_shunt_1 *)malloc(sizeof(*p));
+    if (p == NULL)
     {
-      printf("AE-Mesh frontMainBatt1V: %f\n", remoteVoltage0Struct.frontMainBatt1V);
-      localVoltage0Struct.frontMainBatt1V = remoteVoltage0Struct.frontMainBatt1V;
+      Serial.println("Failed to allocate memory for shunt update");
+      break;
     }
+    memcpy(p, &tmp, sizeof(*p));
 
-    if (remoteVoltage0Struct.frontAuxBatt1V != -1)
-    {
-      printf("AE-Mesh frontAuxBatt1V: %f\n", remoteVoltage0Struct.frontAuxBatt1V);
-      localVoltage0Struct.frontAuxBatt1V = remoteVoltage0Struct.frontAuxBatt1V;
-    }
-
-    if (remoteVoltage0Struct.rearMainBatt1V != -1)
-    {
-      printf("AE-Mesh rearMainBatt1V: %f\n", remoteVoltage0Struct.rearMainBatt1V);
-      localVoltage0Struct.rearMainBatt1V = remoteVoltage0Struct.rearMainBatt1V;
-    }
-
-    if (remoteVoltage0Struct.rearAuxBatt1V != -1)
-    {
-      lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-      // char myNewCombinedArray[48];
-      // strcpy(myNewCombinedArray, loc.city);
-      // strcat(myNewCombinedArray, ": ");
-      // strcat(myNewCombinedArray, loc.region);
-      lv_label_set_text(ui_aeLandingBottomLabel, "AE-Mesh: rearAuxBatt1V");
-
-      lv_label_set_text_fmt(ui_battVLabelSensor, "%.2f", remoteVoltage0Struct.rearAuxBatt1V);
-      lv_arc_set_value(ui_SBattVArc, remoteVoltage0Struct.rearAuxBatt1V * 100);
-
-      printf("AE-Mesh rearAuxBatt1V: %f\n", remoteVoltage0Struct.rearAuxBatt1V);
-      localVoltage0Struct.rearAuxBatt1V = remoteVoltage0Struct.rearAuxBatt1V;
-    }
-
-    if (remoteVoltage0Struct.rearAuxBatt1I != -1)
-    {
-      printf("AE-Mesh rearAuxBatt1I: %f\n", remoteVoltage0Struct.rearAuxBatt1I);
-      localVoltage0Struct.rearAuxBatt1I = remoteVoltage0Struct.rearAuxBatt1I;
-    }
-
-    if (remoteVoltage0Struct.frontAuxBatt1I != -1)
-    {
-      printf("AE-Mesh frontAuxBatt1I: %f\n", remoteVoltage0Struct.frontAuxBatt1I);
-      localVoltage0Struct.frontAuxBatt1I = remoteVoltage0Struct.frontAuxBatt1I;
-    }
-
-    if (remoteVoltage0Struct.rearMainBatt1I != -1)
-    {
-      printf("AE-Mesh rearMainBatt1I: %f\n", remoteVoltage0Struct.rearMainBatt1I);
-      localVoltage0Struct.rearMainBatt1I = remoteVoltage0Struct.rearMainBatt1I;
-    }
-
-    if (remoteVoltage0Struct.rearAuxBatt1I != -1)
-    {
-      printf("AE-Mesh rearAuxBatt1I: %f\n", remoteVoltage0Struct.rearAuxBatt1I);
-      localVoltage0Struct.rearAuxBatt1I = remoteVoltage0Struct.rearAuxBatt1I;
-    }
-    break;
+    // Schedule LVGL-safe update (runs in LVGL thread)
+    lv_async_call(lv_update_shunt_ui_cb, (void *)p);
+  }
+  break;
   }
 }
 
@@ -515,7 +520,7 @@ void Task_main(void *pvParameters)
     {
       // 10 seconds have elapsed, do something here
       screen_index = 0; // reset the encoder counter ater 10 seconds
-      bleHandler.startScan(5);
+      // bleHandler.startScan(5); // ToDo: enable BLE or AE mesh, one only
       timerRunning = false; // Reset timer if you want to run again
     }
 
@@ -639,15 +644,20 @@ void setup()
     return;
   }
 
-  // Add peer
+  // Add peer (broadcast). Initialize peerInfo first.
+  memset(&peerInfo, 0, sizeof(peerInfo));
+  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+  peerInfo.channel = 0; // current channel
+  peerInfo.encrypt = false;
+
   if (esp_now_add_peer(&peerInfo) != ESP_OK)
   {
     Serial.println("Failed to add peer");
-    return;
+    // not fatal: continue — broadcasting may still work on some SDKs
   }
 
   // Register for a callback function that will be called when data is received
-  //esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
+  esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
 
   String LVGL_Arduino = "Hello from an AE 52mm Gauge using LVGL: ";
   LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();

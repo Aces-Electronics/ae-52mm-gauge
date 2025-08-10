@@ -150,6 +150,52 @@ String offReasonToString(uint32_t offReason) {
     return result;
 }
 
+// LVGL async callback for BLE UI updates (runs in LVGL context)
+static void lv_update_ble_ui_cb(void *user_data)
+{
+    lv_ble_ui_data_t *d = (lv_ble_ui_data_t *)user_data;
+    if (!d) return;
+
+    // Unhide bottom label and update battery voltage text (same as previous inlined code)
+    lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE-BLE Rear Battery: %.2fV", d->inputVoltage);
+
+    // Ensure battery screen is enabled and visible
+    enable_ui_batteryScreen = true;
+    lv_obj_t * current_screen = lv_scr_act();
+    if(current_screen != ui_batteryScreen)
+    {
+        screen_change_requested = true;
+        screen_index = 1;
+        bezel_right = true;
+    }
+
+    lv_label_set_text_fmt(ui_battVLabelSensor, "%.2f", d->inputVoltage);
+    lv_arc_set_value(ui_SBattVArc, (int)(d->inputVoltage * 10)); // match BLE scaling
+
+    // Optionally update other labels if they exist:
+    // lv_label_set_text_fmt(ui_battILabelSensor, "%.2f A", d->inputCurrent);
+    // lv_label_set_text_fmt(ui_battPowerLabel, "%.2f W", d->outputVoltage); // rename if appropriate
+
+    // Debug print (safe; uses local copy)
+    // Serial.printf("%s, Battery: %.2f Volts, Load: %.2f Volts\n"
+    //               "Alarm Reason: %s\n"
+    //               "Device State: %s\n"
+    //               "Error Code: %s\n"
+    //               "Warning Reason: %d\n"
+    //               "Off Reason: %s\n",
+    //               d->deviceName,
+    //               d->inputVoltage, d->outputVoltage,
+    //               alarmReasonToString(d->alarmReason).c_str(),
+    //               deviceStateToString(d->deviceState),
+    //               errorCodeToString(d->errorCode),
+    //               d->warningReason,
+    //               offReasonToString(d->offReason).c_str());
+
+    // free the heap allocation that the BLE callback made
+    free(d);
+}
+
 BLEHandler::BLEHandler(struct_message_voltage0 *voltageStruct)
 {
     // Store the pointer or copy data as needed
@@ -290,37 +336,22 @@ void BLEHandler::onResult(BLEAdvertisedDevice *advertisedDevice)
         float outputVoltage = float(victronData->outputVoltage) * 0.01;
         uint32_t offReason = victronData->offReason;
 
-        // localVoltage0Struct.rearAuxBatt1V = outputVoltage; // ToDo: unhack me
+        // after you've computed inputVoltage, outputVoltage, savedDeviceName, etc.
+        lv_ble_ui_data_t *d = (lv_ble_ui_data_t *)malloc(sizeof(lv_ble_ui_data_t));
+        if (d) {
+            d->inputVoltage = inputVoltage;
+            d->outputVoltage = outputVoltage;
+            d->alarmReason = alarmReason;
+            d->deviceState = deviceState;
+            d->errorCode = errorCode;
+            d->warningReason = warningReason;
+            d->offReason = offReason;
+            strncpy(d->deviceName, savedDeviceName, sizeof(d->deviceName));
+            d->deviceName[sizeof(d->deviceName)-1] = '\0';
 
-        
-        lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE-BLE Rear Battery: %.2fV     ", inputVoltage);
-        enable_ui_batteryScreen = true;
-        
-        lv_obj_t * current_screen = lv_scr_act(); //get active screen
-        if(current_screen != ui_batteryScreen)
-        {
-            screen_change_requested = true;
-            screen_index = 1; // or whatever screen index corresponds to ui_batteryScreen
-            bezel_right = true;
-        } 
-
-        lv_label_set_text_fmt(ui_battVLabelSensor, "%.2f", inputVoltage);
-        lv_arc_set_value(ui_SBattVArc, inputVoltage * 10); // * 10 to allow for the arc to deal with floats
-        
-
-        Serial.printf("%s, Battery: %.2f Volts, Load: %.2f Volts\n"
-              "Alarm Reason: %s\n"
-              "Device State: %s\n"
-              "Error Code: %s\n"
-              "Warning Reason: %d\n"
-              "Off Reason: %s\n",
-              savedDeviceName,
-              inputVoltage, outputVoltage,
-              alarmReasonToString(alarmReason).c_str(),
-              deviceStateToString(deviceState),
-              errorCodeToString(errorCode),
-              warningReason,  // You can add a similar parser for warnings if you want
-              offReasonToString(offReason).c_str());
+            lv_async_call(lv_update_ble_ui_cb, d);
+        } else {
+            Serial.println("Failed allocating BLE UI data");
+        }
     }
 }

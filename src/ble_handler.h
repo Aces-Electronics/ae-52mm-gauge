@@ -4,8 +4,9 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <NimBLEadvertisedDevice.h>
-#include "NimBLEBeacon.h"
 #include <aes/esp_aes.h>
+#include "NimBLEBeacon.h"
+#include "shared_defs.h" // use the same definitions as the shunt
 
 struct struct_message_voltage0;
 extern bool enable_ui_batteryScreen;
@@ -13,28 +14,6 @@ extern bool screen_change_requested;
 extern int screen_index;
 extern bool bezel_right;
 
-typedef struct {
-  uint16_t vendorID;
-  uint8_t beaconType;
-  uint8_t unknownData1[3];
-  uint8_t victronRecordType;
-  uint16_t nonceDataCounter;
-  uint8_t encryptKeyMatch;
-  uint8_t victronEncryptedData[21];
-  uint8_t nullPad;
-} __attribute__((packed)) victronManufacturerData;
-
-typedef struct {
-   uint8_t deviceState;
-   uint8_t outputState;
-   uint8_t errorCode;
-   uint16_t alarmReason;
-   uint16_t warningReason;
-   uint16_t inputVoltage;
-   uint16_t outputVoltage;
-   uint32_t offReason;
-   uint8_t  unused[32];
-} __attribute__((packed)) victronPanelData;
 
 class BLEHandler : public BLEAdvertisedDeviceCallbacks {
 public:
