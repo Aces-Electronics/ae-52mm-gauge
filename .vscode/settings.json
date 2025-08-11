@@ -1,3 +1,4 @@
 {
     "C_Cpp.default.compilerPath": "/Users/acea/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-gcc",
+    "idf.pythonInstallPath": "/usr/bin/python3",
 }

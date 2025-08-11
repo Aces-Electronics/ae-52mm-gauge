@@ -107,11 +107,7 @@ int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 
 // Shared shunt storage and task-synchronisation flag
 volatile bool shuntUiUpdatePending = false;          // set by ESP-NOW callback, cleared in LVGL task
-struct_message_ae_smart_shunt_1 localAeShuntStruct;  // used by UI
-struct_message_ae_smart_shunt_1 remoteAeShuntStruct; // temp copy from incoming bytes
-
 struct_message_voltage0 localVoltage0Struct;
-struct_message_voltage0 remoteVoltage0Struct;
 
 BLEHandler bleHandler(&localVoltage0Struct);
 esp_now_peer_info_t peerInfo;
@@ -153,14 +149,13 @@ static void lv_update_shunt_ui_cb(void *user_data)
     return;
 
   // Use the same UI updates you used in Task_TFT, running here in LVGL context.
-  // lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-  // lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE-Shunt: %.2fV  %.2fA  %.2fW\nRun: %s",
-  //                       p->batteryVoltage,
-  //                       p->batteryCurrent,
-  //                       p->batteryPower,
-  //                       p->runFlatTime);
+  lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+  lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE-Shunt: %.2fV  %.2fA  %.2fW",
+                        p->batteryVoltage,
+                        p->batteryCurrent,
+                        p->batteryPower);
 
-  Serial.printf("Local Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
+  Serial.printf("Local Shunt: %.2fV %.2fA %.2fW %.fSOC %.2fAh %s",
     p->batteryVoltage,
     p->batteryCurrent,
     p->batteryPower,
@@ -168,12 +163,22 @@ static void lv_update_shunt_ui_cb(void *user_data)
     p->batteryCapacity,
     p->runFlatTime);
 
+  if (p->batteryCurrent > 0)
+  {
+    lv_arc_set_range(ui_SBattVArc, 116,134);
+  }
+  else
+  {
+    lv_arc_set_range(ui_SBattVArc, 116,144);
+  }
 
-  lv_label_set_text_fmt(ui_battVLabelSensor, "%.2f", "13.00");
+  lv_label_set_text_fmt(ui_battVLabelSensor, "%05.2f", p->batteryVoltage);
   lv_arc_set_value(ui_SBattVArc, (int)(p->batteryVoltage * 10));
 
+  lv_label_set_text_fmt(ui_battALabelSensor, "%05.2f", p->batteryCurrent);
+
+  lv_label_set_text_fmt(ui_BatteryTime, "%s", p->runFlatTime);
   // If you have other labels, update them here:
-  // lv_label_set_text_fmt(ui_battILabelSensor, "%.2f A", p->batteryCurrent);
   // lv_label_set_text_fmt(ui_battPowerLabel, "%.2f W", p->batteryPower);
   // lv_label_set_text_fmt(ui_battSOCLabel, "%.0f%%", p->batterySOC * 100.0f);
 
@@ -201,7 +206,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 
   switch (type)
   {
-  case 1: // message ID 1 - AE Smart Shunt
+  case 11: // message ID 1 - AE Smart Shunt
   {
     Serial.println("Received AE-Smart-Shunt data");
 

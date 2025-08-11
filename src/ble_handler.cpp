@@ -349,7 +349,7 @@ void BLEHandler::onResult(BLEAdvertisedDevice *advertisedDevice)
             strncpy(d->deviceName, savedDeviceName, sizeof(d->deviceName));
             d->deviceName[sizeof(d->deviceName)-1] = '\0';
 
-            lv_async_call(lv_update_ble_ui_cb, d);
+            //lv_async_call(lv_update_ble_ui_cb, d); // ToDo: enablw when BLE needed
         } else {
             Serial.println("Failed allocating BLE UI data");
         }
