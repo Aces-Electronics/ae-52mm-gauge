@@ -17,6 +17,13 @@
 
 String SSID_cpp = "MySSID";
 String PWD_cpp = "MyPassword";
+
+// This will be executed in the LVGL thread context (safe).
+static const float BATTERY_CURRENT_ALERT_A = 50.0f; // tune as needed
+static const float BATTERY_SOC_ALERT = 0.10f;       // 10% SOC
+static const float BATTERY_VOLTAGE_LOW = 10.0f;     // tune for your pack
+static const float BATTERY_VOLTAGE_HIGH = 15.0f;    // tune for your pack
+
 const char *SSID_c = nullptr;
 const char *PWD_c = nullptr;
 
@@ -33,15 +40,6 @@ const char *PWD_c = nullptr;
 #define CLK 13
 #define DT 10
 #define SW 14
-
-/*Change to your screen resolution*/
-static const uint16_t screenWidth = 480;
-static const uint16_t screenHeight = 480;
-
-bool screen_change_requested = false;
-
-static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[screenWidth * screenHeight / 5];
 
 Encoder e(CLK, DT, SW);
 
@@ -65,6 +63,15 @@ Arduino_ST7701_RGBPanel *gfx = new Arduino_ST7701_RGBPanel(
     true /* BGR */,
     10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
     10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
+
+/*Change to your screen resolution*/
+static const uint16_t screenWidth = 480;
+static const uint16_t screenHeight = 480;
+
+bool screen_change_requested = false;
+
+static lv_disp_draw_buf_t draw_buf;
+static lv_color_t buf[screenWidth * screenHeight / 5];
 
 bool bezel_right = false;
 bool bezel_left = false;
@@ -112,6 +119,91 @@ struct_message_voltage0 localVoltage0Struct;
 BLEHandler bleHandler(&localVoltage0Struct);
 esp_now_peer_info_t peerInfo;
 
+// Mesh indicator / heartbeat UI helpers
+static lv_timer_t *g_mesh_timer = NULL;
+static uint32_t g_mesh_expire_ms = 0; // millis when mesh blinking should stop
+static const uint32_t MESH_DURATION_MS = 20000; // 16 seconds
+static const uint32_t MESH_TOGGLE_MS = 500;     // toggle every 500ms -> 1Hz blink
+
+static lv_timer_t *g_heartbeat_timer = NULL;
+static int g_heartbeat_step = 0;
+static const int HEARTBEAT_STEPS = 4;
+static const uint32_t HEARTBEAT_INTERVAL_MS = 200; // 200ms per phase
+
+// Helper: set common battery UI elements' text color (if object is present)
+static void set_battery_elements_color(lv_color_t color)
+{
+  if (ui_battVLabelSensor) lv_obj_set_style_text_color(ui_battVLabelSensor, color, 0);
+  if (ui_battALabelSensor) lv_obj_set_style_text_color(ui_battALabelSensor, color, 0);
+  if (ui_SOCLabel) lv_obj_set_style_text_color(ui_SOCLabel, color, 0);
+  if (ui_BatteryTime) lv_obj_set_style_text_color(ui_BatteryTime, color, 0);
+  if (ui_aeLandingBottomLabel) lv_obj_set_style_text_color(ui_aeLandingBottomLabel, color, 0);
+  if (ui_feedbackLabel) lv_obj_set_style_text_color(ui_feedbackLabel, color, 0);
+}
+
+// Mesh timer callback (runs in LVGL context)
+static void mesh_timer_cb(lv_timer_t *timer)
+{
+  (void)timer;
+  // If expired, hide the indicator and stop timer
+  if (millis() > g_mesh_expire_ms)
+  {
+    if (ui_meshIndicator)
+      lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+
+    if (g_mesh_timer)
+    {
+      lv_timer_del(g_mesh_timer);
+      g_mesh_timer = NULL;
+    }
+    return;
+  }
+
+  // Toggle visibility
+  if (!ui_meshIndicator)
+    return;
+
+  if (lv_obj_has_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN))
+    lv_obj_clear_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+  else
+    lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Heartbeat timer callback: steps through red/white flashes then stops
+static void heartbeat_timer_cb(lv_timer_t *timer)
+{
+  (void)timer;
+
+  switch (g_heartbeat_step)
+  {
+  case 0:
+    // Red
+    set_battery_elements_color(lv_color_hex(0xFF0000));
+    break;
+  case 1:
+    // White
+    set_battery_elements_color(lv_color_hex(0xFFFFFF));
+    break;
+  case 2:
+    // Red
+    set_battery_elements_color(lv_color_hex(0xFF0000));
+    break;
+  case 3:
+    // Back to White and stop
+    set_battery_elements_color(lv_color_hex(0xFFFFFF));
+    if (g_heartbeat_timer)
+    {
+      lv_timer_del(g_heartbeat_timer);
+      g_heartbeat_timer = NULL;
+    }
+    g_heartbeat_step = 0;
+    return;
+  }
+
+  g_heartbeat_step++;
+}
+
+
 void update_c_strings()
 {
   SSID_c = SSID_cpp.c_str();
@@ -141,7 +233,7 @@ void toggleBacklightDim()
 }
 
 // Async LVGL callback used to update UI from data received in ESP-NOW callback.
-// This will be executed in the LVGL thread context (safe).
+
 static void lv_update_shunt_ui_cb(void *user_data)
 {
   struct_message_ae_smart_shunt_1 *p = (struct_message_ae_smart_shunt_1 *)user_data;
@@ -155,7 +247,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
                         p->batteryCurrent,
                         p->batteryPower);
 
-  Serial.printf("Local Shunt: %.2fV %.2fA %.2fW %.fSOC %.2fAh %s",
+  Serial.printf("Local Shunt: %.2fV %.2fA %.2fW %.fSOC %.2fAh %s\n",
     p->batteryVoltage,
     p->batteryCurrent,
     p->batteryPower,
@@ -163,24 +255,27 @@ static void lv_update_shunt_ui_cb(void *user_data)
     p->batteryCapacity,
     p->runFlatTime);
 
-  if (p->batteryCurrent > 0)
+  if (p->batteryCurrent < -0.05f)
   {
-    lv_arc_set_range(ui_SBattVArc, 116,134);
+    lv_arc_set_range(ui_SBattVArc, 116,144);
   }
   else
   {
-    lv_arc_set_range(ui_SBattVArc, 116,144);
+    lv_arc_set_range(ui_SBattVArc, 116,130);
   }
 
   lv_label_set_text_fmt(ui_battVLabelSensor, "%05.2f", p->batteryVoltage);
   lv_arc_set_value(ui_SBattVArc, (int)(p->batteryVoltage * 10));
 
   lv_label_set_text_fmt(ui_battALabelSensor, "%05.2f", p->batteryCurrent);
+  lv_arc_set_value(ui_SA1Arc, (int)(p->batteryCurrent));
+
+  lv_label_set_text_fmt(ui_SOCLabel, "%.0f%%", p->batterySOC * 100.0f);
 
   lv_label_set_text_fmt(ui_BatteryTime, "%s", p->runFlatTime);
+
   // If you have other labels, update them here:
   // lv_label_set_text_fmt(ui_battPowerLabel, "%.2f W", p->batteryPower);
-  // lv_label_set_text_fmt(ui_battSOCLabel, "%.0f%%", p->batterySOC * 100.0f);
 
   enable_ui_batteryScreen = true;
   lv_obj_t *current_screen = lv_scr_act();
@@ -189,6 +284,43 @@ static void lv_update_shunt_ui_cb(void *user_data)
     screen_change_requested = true;
     screen_index = 1; // battery screen index
     bezel_right = true;
+  }
+
+  // --- Start/refresh mesh indicator blinking for MESH_DURATION_MS ---
+  g_mesh_expire_ms = millis() + MESH_DURATION_MS;
+  if (ui_meshIndicator)
+  {
+    // ensure visible so the timer toggles it
+    lv_obj_clear_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+
+    if (!g_mesh_timer)
+    {
+      g_mesh_timer = lv_timer_create(mesh_timer_cb, MESH_TOGGLE_MS, NULL);
+    }
+    else
+    {
+      // timer already exists; keep it running and visible
+      lv_timer_set_period(g_mesh_timer, MESH_TOGGLE_MS);
+    }
+  }
+
+  // --- Battery issue detection and heartbeat flash ---
+  bool battery_issue = false;
+  if (p->batterySOC >= 0.0f && p->batterySOC < BATTERY_SOC_ALERT) battery_issue = true;
+  if (fabsf(p->batteryCurrent) > BATTERY_CURRENT_ALERT_A) battery_issue = true;
+  if (p->batteryVoltage < BATTERY_VOLTAGE_LOW || p->batteryVoltage > BATTERY_VOLTAGE_HIGH) battery_issue = true;
+
+  if (battery_issue)
+  {
+    // start heartbeat sequence (red/white/red/white)
+    g_heartbeat_step = 0;
+
+    if (g_heartbeat_timer)
+    {
+      lv_timer_del(g_heartbeat_timer);
+      g_heartbeat_timer = NULL;
+    }
+    g_heartbeat_timer = lv_timer_create(heartbeat_timer_cb, HEARTBEAT_INTERVAL_MS, NULL);
   }
 
   // Free the heap memory we allocated in the ESP-NOW callback
@@ -218,8 +350,6 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     tmp.runFlatTime[sizeof(tmp.runFlatTime) - 1] = '\0'; // ensure NUL
 
     // Debug
-    Serial.print("Bytes received: ");
-    Serial.println(len);
     Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
                   tmp.batteryVoltage,
                   tmp.batteryCurrent,
@@ -491,15 +621,6 @@ void Task_TFT(void *pvParameters)
         break;
       case 1:
         changeScreen(ui_batteryScreen, enable_ui_batteryScreen, "Battery Screen");
-        break;
-      case 2:
-        changeScreen(ui_oilScreen, enable_ui_oilScreen, "Oil Screen");
-        break;
-      case 3:
-        changeScreen(ui_coolantScreen, enable_ui_coolantScreen, "Coolant Screen");
-        break;
-      case 4:
-        changeScreen(ui_turboExhaustScreen, enable_ui_turboExhaustScreen, "EGR/Turbo Screen");
         break;
       default:
         Serial.println("Unknown screen index");
