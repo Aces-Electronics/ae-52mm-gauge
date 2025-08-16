@@ -26,11 +26,8 @@ extern "C" {
 #include "ui_events.h"
 
 ///////////////////// SCREENS ////////////////////
-#include "screens/ui_bootInitialScreen.h"
-#include "screens/ui_batteryScreen.h"
-#include "screens/ui_oilScreen.h"
-#include "screens/ui_coolantScreen.h"
-#include "screens/ui_turboExhaustScreen.h"
+#include "ui_bootInitialScreen.h"
+#include "ui_batteryScreen.h"
 
 ///////////////////// VARIABLES ////////////////////
 
@@ -43,15 +40,18 @@ LV_IMG_DECLARE( ui_img_501072417);   // assets/ae-cog-96.png
 LV_IMG_DECLARE( ui_img_ae_white_128_png);   // assets/ae_white_128.png
 LV_IMG_DECLARE( ui_img_1917549703);   // assets/ae-map-marker-96.png
 LV_IMG_DECLARE( ui_img_2056808699);   // assets/ae-gauge-battery-128.png
-LV_IMG_DECLARE( ui_img_1105680357);   // assets/ae-oil-temp-128.png
 LV_IMG_DECLARE( ui_img_2930172);   // assets/ae-coolant-128.png
-LV_IMG_DECLARE( ui_img_1209853138);   // assets/ae-turbo-128.png
 LV_IMG_DECLARE( ui_img_2022370193);   // assets/ae-esp-now-96.png
 LV_IMG_DECLARE( ui_img_1749172309);   // assets/ae-gauge-settings-96.png
 LV_IMG_DECLARE( ui_img_2105704960);   // assets/ae-low-rssi-96.png
+LV_IMG_DECLARE( ui_img_1105680357);   // assets/ae-oil-temp-128.png
 LV_IMG_DECLARE( ui_img_539538216);   // assets/ae-settings-erase-96.png
+LV_IMG_DECLARE( ui_img_1209853138);   // assets/ae-turbo-128.png
 LV_IMG_DECLARE( ui_img_2104900491);   // assets/ae-wifi-off-96.png
 LV_IMG_DECLARE( ui_img_943648365);   // assets/ae-wifi-settings-96.png
+
+// FONTS
+LV_FONT_DECLARE( ui_font_AE64BOLD);
 
 // UI INIT
 void ui_init(void);

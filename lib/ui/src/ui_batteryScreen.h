@@ -14,8 +14,6 @@ extern "C" {
 extern void ui_batteryScreen_screen_init(void);
 extern void ui_batteryScreen_screen_destroy(void);
 extern lv_obj_t *ui_batteryScreen;
-extern lv_obj_t *ui_batteryV146;
-extern lv_obj_t *ui_batteryV136;
 extern lv_obj_t *ui_SBattVArc;
 extern lv_obj_t *ui_SA1Arc;
 extern lv_obj_t *ui_battVLabelSensor;
@@ -26,7 +24,9 @@ extern lv_obj_t *ui_startBatteryLabel;
 extern void ui_event_aeIconBatteryScreen1( lv_event_t * e);
 extern lv_obj_t *ui_aeIconBatteryScreen1;
 extern lv_obj_t *ui_Image1;
-extern lv_obj_t *ui_startBatteryTime;
+extern lv_obj_t *ui_BatteryTime;
+extern lv_obj_t *ui_SOCLabel;
+extern lv_obj_t *ui_meshIndicator;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

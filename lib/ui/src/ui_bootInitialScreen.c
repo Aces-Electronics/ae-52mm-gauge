@@ -3,7 +3,7 @@
 // LVGL version: 8.3.6
 // Project name: ae_52mm_gauge
 
-#include "../ui.h"
+#include "ui.h"
 
 lv_obj_t *ui_bootInitialScreen = NULL;lv_obj_t *ui_Spinner1 = NULL;lv_obj_t *ui_feedbackLabel = NULL;lv_obj_t *ui_wifiIcon = NULL;lv_obj_t *ui_settingsIcon = NULL;lv_obj_t *ui_aeLandingIcon = NULL;lv_obj_t *ui_SSIDLabel = NULL;lv_obj_t *ui_SSIDInputText = NULL;lv_obj_t *ui_SSIDPasswordLabel = NULL;lv_obj_t *ui_SSIDPasswordInputText = NULL;lv_obj_t *ui_Keyboard = NULL;lv_obj_t *ui_landingBackButton = NULL;lv_obj_t *ui_aeLandingBottomLabel = NULL;lv_obj_t *ui_aeLandingBottomIcon = NULL;
 // event funtions
@@ -249,24 +249,20 @@ lv_obj_set_style_pad_top(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAUL
 lv_obj_set_style_pad_bottom(ui_landingBackButton, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_aeLandingBottomLabel = lv_label_create(ui_bootInitialScreen);
-lv_obj_set_width( ui_aeLandingBottomLabel, 320);
+lv_obj_set_width( ui_aeLandingBottomLabel, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_aeLandingBottomLabel, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_aeLandingBottomLabel, 0 );
 lv_obj_set_y( ui_aeLandingBottomLabel, 140 );
 lv_obj_set_align( ui_aeLandingBottomLabel, LV_ALIGN_CENTER );
 lv_label_set_long_mode(ui_aeLandingBottomLabel,LV_LABEL_LONG_SCROLL_CIRCULAR);
 lv_label_set_text(ui_aeLandingBottomLabel,"AE: looking for sensors to connect to...");
-lv_obj_add_flag( ui_aeLandingBottomLabel, LV_OBJ_FLAG_CLICKABLE );   /// Flags
+lv_obj_clear_flag( ui_aeLandingBottomLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
+lv_obj_set_scroll_dir(ui_aeLandingBottomLabel, LV_DIR_HOR);
 lv_obj_set_style_text_color(ui_aeLandingBottomLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_aeLandingBottomLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_text_align(ui_aeLandingBottomLabel, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_aeLandingBottomLabel, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_bg_color(ui_aeLandingBottomLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_left(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_right(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_top(ui_aeLandingBottomLabel, 20, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_bottom(ui_aeLandingBottomLabel, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_aeLandingBottomIcon = lv_img_create(ui_aeLandingBottomLabel);
 lv_img_set_src(ui_aeLandingBottomIcon, &ui_img_1917549703);
@@ -275,8 +271,8 @@ lv_obj_set_height( ui_aeLandingBottomIcon, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_aeLandingBottomIcon, -120 );
 lv_obj_set_y( ui_aeLandingBottomIcon, -12 );
 lv_obj_set_align( ui_aeLandingBottomIcon, LV_ALIGN_CENTER );
-lv_obj_add_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
-lv_obj_clear_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_add_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_img_set_zoom(ui_aeLandingBottomIcon,128);
 
 lv_obj_add_event_cb(ui_wifiIcon, ui_event_wifiIcon, LV_EVENT_ALL, NULL);
@@ -284,6 +280,7 @@ lv_obj_add_event_cb(ui_settingsIcon, ui_event_settingsIcon, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_aeLandingIcon, ui_event_aeLandingIcon, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_SSIDInputText, ui_event_SSIDInputText, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_SSIDPasswordInputText, ui_event_SSIDPasswordInputText, LV_EVENT_ALL, NULL);
+lv_keyboard_set_textarea(ui_Keyboard,ui_SSIDInputText);
 lv_obj_add_event_cb(ui_Keyboard, ui_event_Keyboard, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_landingBackButton, ui_event_landingBackButton, LV_EVENT_ALL, NULL);
 

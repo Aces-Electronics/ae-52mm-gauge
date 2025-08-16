@@ -5,8 +5,5 @@
 .vscode/ipch
 .DS_Store
 src/passwords.h
-src/ui/autosave/*
 ui/autosave/
 ui/backup/
-lib/mf_Lvgl.zip
-ui/autosave/ae_52mm_gauge_autosave00.zip

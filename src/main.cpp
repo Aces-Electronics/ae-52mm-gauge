@@ -255,7 +255,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
     p->batteryCapacity,
     p->runFlatTime);
 
-  if (p->batteryCurrent < -0.05f)
+  if (p->batteryCurrent < -0.15f)
   {
     lv_arc_set_range(ui_SBattVArc, 116,144);
   }
