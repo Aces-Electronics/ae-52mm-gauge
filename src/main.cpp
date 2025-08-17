@@ -21,7 +21,7 @@ String PWD_cpp = "MyPassword";
 // This will be executed in the LVGL thread context (safe).
 static const float BATTERY_CURRENT_ALERT_A = 50.0f; // tune as needed
 static const float BATTERY_SOC_ALERT = 0.10f;       // 10% SOC
-static const float BATTERY_VOLTAGE_LOW = 10.0f;     // tune for your pack
+static const float BATTERY_VOLTAGE_LOW = 11.6f;     // tune for your pack
 static const float BATTERY_VOLTAGE_HIGH = 15.0f;    // tune for your pack
 
 const char *SSID_c = nullptr;
