@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_batteryScreen = NULL;lv_obj_t *ui_SBattVArc = NULL;lv_obj_t *ui_SA1Arc = NULL;lv_obj_t *ui_battVLabelSensor = NULL;lv_obj_t *ui_battALabelSensor = NULL;lv_obj_t *ui_batteryVLabel = NULL;lv_obj_t *ui_batteryALabel = NULL;lv_obj_t *ui_startBatteryLabel = NULL;lv_obj_t *ui_aeIconBatteryScreen1 = NULL;lv_obj_t *ui_Image1 = NULL;lv_obj_t *ui_BatteryTime = NULL;lv_obj_t *ui_SOCLabel = NULL;lv_obj_t *ui_meshIndicator = NULL;
+lv_obj_t *ui_batteryScreen = NULL;lv_obj_t *ui_SBattVArc = NULL;lv_obj_t *ui_SA1Arc = NULL;lv_obj_t *ui_battVLabelSensor = NULL;lv_obj_t *ui_battALabelSensor = NULL;lv_obj_t *ui_batteryVLabel = NULL;lv_obj_t *ui_batteryALabel = NULL;lv_obj_t *ui_startBatteryLabel = NULL;lv_obj_t *ui_starterBatteryVoltageLabel = NULL;lv_obj_t *ui_aeIconBatteryScreen1 = NULL;lv_obj_t *ui_Image1 = NULL;lv_obj_t *ui_BatteryTime = NULL;lv_obj_t *ui_SOCLabel = NULL;lv_obj_t *ui_meshIndicator = NULL;
 // event funtions
 void ui_event_aeIconBatteryScreen1( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -126,6 +126,18 @@ lv_obj_set_style_text_color(ui_startBatteryLabel, lv_color_hex(0xFFFFFF), LV_PAR
 lv_obj_set_style_text_opa(ui_startBatteryLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_startBatteryLabel, &lv_font_montserrat_20, LV_PART_MAIN| LV_STATE_DEFAULT);
 
+ui_starterBatteryVoltageLabel = lv_label_create(ui_batteryScreen);
+lv_obj_set_width( ui_starterBatteryVoltageLabel, LV_SIZE_CONTENT);
+lv_obj_set_height( ui_starterBatteryVoltageLabel, LV_SIZE_CONTENT);
+lv_obj_set_x( ui_starterBatteryVoltageLabel, 0 );
+lv_obj_set_y( ui_starterBatteryVoltageLabel, 125 );
+lv_obj_set_align( ui_starterBatteryVoltageLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_starterBatteryVoltageLabel,"12.8V");
+lv_obj_clear_flag( ui_starterBatteryVoltageLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );
+lv_obj_set_style_text_color(ui_starterBatteryVoltageLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_starterBatteryVoltageLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_starterBatteryVoltageLabel, &lv_font_montserrat_26, LV_PART_MAIN| LV_STATE_DEFAULT);
+
 ui_aeIconBatteryScreen1 = lv_img_create(ui_batteryScreen);
 lv_img_set_src(ui_aeIconBatteryScreen1, &ui_img_ae_white_128_png);
 lv_obj_set_width( ui_aeIconBatteryScreen1, LV_SIZE_CONTENT);  /// 1
@@ -203,6 +215,7 @@ ui_battALabelSensor= NULL;
 ui_batteryVLabel= NULL;
 ui_batteryALabel= NULL;
 ui_startBatteryLabel= NULL;
+ui_starterBatteryVoltageLabel = NULL;
 ui_aeIconBatteryScreen1= NULL;
 ui_Image1= NULL;
 ui_BatteryTime= NULL;

@@ -276,6 +276,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   // If you have other labels, update them here:
   // lv_label_set_text_fmt(ui_battPowerLabel, "%.2f W", p->batteryPower);
+  lv_label_set_text_fmt(ui_starterBatteryVoltageLabel, "%.2fV", p->starterBatteryVoltage);
 
   enable_ui_batteryScreen = true;
   lv_obj_t *current_screen = lv_scr_act();
