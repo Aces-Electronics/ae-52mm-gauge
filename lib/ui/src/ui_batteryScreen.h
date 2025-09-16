@@ -21,6 +21,7 @@ extern lv_obj_t *ui_battALabelSensor;
 extern lv_obj_t *ui_batteryVLabel;
 extern lv_obj_t *ui_batteryALabel;
 extern lv_obj_t *ui_startBatteryLabel;
+extern lv_obj_t *ui_starterBatteryVoltageLabel;
 extern void ui_event_aeIconBatteryScreen1( lv_event_t * e);
 extern lv_obj_t *ui_aeIconBatteryScreen1;
 extern lv_obj_t *ui_Image1;
