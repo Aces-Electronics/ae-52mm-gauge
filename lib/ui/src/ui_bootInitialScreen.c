@@ -5,7 +5,8 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_bootInitialScreen = NULL;lv_obj_t *ui_Spinner1 = NULL;lv_obj_t *ui_feedbackLabel = NULL;lv_obj_t *ui_wifiIcon = NULL;lv_obj_t *ui_settingsIcon = NULL;lv_obj_t *ui_aeLandingIcon = NULL;lv_obj_t *ui_SSIDLabel = NULL;lv_obj_t *ui_SSIDInputText = NULL;lv_obj_t *ui_SSIDPasswordLabel = NULL;lv_obj_t *ui_SSIDPasswordInputText = NULL;lv_obj_t *ui_Keyboard = NULL;lv_obj_t *ui_landingBackButton = NULL;lv_obj_t *ui_aeLandingBottomLabel = NULL;lv_obj_t *ui_aeLandingBottomIcon = NULL;
+lv_obj_t *uic_VictronCheckbox;
+lv_obj_t *ui_bootInitialScreen = NULL;lv_obj_t *ui_Spinner1 = NULL;lv_obj_t *ui_feedbackLabel = NULL;lv_obj_t *ui_wifiIcon = NULL;lv_obj_t *ui_settingsIcon = NULL;lv_obj_t *ui_aeLandingIcon = NULL;lv_obj_t *ui_SSIDLabel = NULL;lv_obj_t *ui_SSIDInputText = NULL;lv_obj_t *ui_SSIDPasswordLabel = NULL;lv_obj_t *ui_SSIDPasswordInputText = NULL;lv_obj_t *ui_Keyboard = NULL;lv_obj_t *ui_landingBackButton = NULL;lv_obj_t *ui_aeLandingBottomLabel = NULL;lv_obj_t *ui_aeLandingBottomIcon = NULL;lv_obj_t *ui_VictronCheckbox = NULL;lv_obj_t *ui_VictronCheckboxLabel = NULL;
 // event funtions
 void ui_event_wifiIcon( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -92,8 +93,8 @@ lv_obj_set_style_arc_opa(ui_Spinner1, 255, LV_PART_INDICATOR| LV_STATE_DEFAULT);
 ui_feedbackLabel = lv_label_create(ui_bootInitialScreen);
 lv_obj_set_width( ui_feedbackLabel, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_feedbackLabel, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_feedbackLabel, 0 );
-lv_obj_set_y( ui_feedbackLabel, -125 );
+lv_obj_set_x( ui_feedbackLabel, -86 );
+lv_obj_set_y( ui_feedbackLabel, -101 );
 lv_obj_set_align( ui_feedbackLabel, LV_ALIGN_CENTER );
 lv_label_set_text(ui_feedbackLabel,"WiFi: UNKNOWN");
 lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
@@ -275,6 +276,27 @@ lv_obj_add_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN );   /// Flags
 lv_obj_clear_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_img_set_zoom(ui_aeLandingBottomIcon,128);
 
+ui_VictronCheckbox = lv_checkbox_create(ui_bootInitialScreen);
+lv_checkbox_set_text(ui_VictronCheckbox,"Enable Victron BLE");
+lv_obj_set_width( ui_VictronCheckbox, 60);
+lv_obj_set_height( ui_VictronCheckbox, 60);
+lv_obj_set_x( ui_VictronCheckbox, -150 );
+lv_obj_set_y( ui_VictronCheckbox, -75 );
+lv_obj_set_align( ui_VictronCheckbox, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_VictronCheckbox, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
+
+ui_VictronCheckboxLabel = lv_label_create(ui_bootInitialScreen);
+lv_obj_set_width( ui_VictronCheckboxLabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_VictronCheckboxLabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_VictronCheckboxLabel, -106 );
+lv_obj_set_y( ui_VictronCheckboxLabel, 462 );
+lv_obj_set_align( ui_VictronCheckboxLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_VictronCheckboxLabel,"WiFi: UNKNOWN");
+lv_obj_set_style_text_color(ui_VictronCheckboxLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_VictronCheckboxLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_align(ui_VictronCheckboxLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_VictronCheckboxLabel, &lv_font_montserrat_28, LV_PART_MAIN| LV_STATE_DEFAULT);
+
 lv_obj_add_event_cb(ui_wifiIcon, ui_event_wifiIcon, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_settingsIcon, ui_event_settingsIcon, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_aeLandingIcon, ui_event_aeLandingIcon, LV_EVENT_ALL, NULL);
@@ -283,6 +305,7 @@ lv_obj_add_event_cb(ui_SSIDPasswordInputText, ui_event_SSIDPasswordInputText, LV
 lv_keyboard_set_textarea(ui_Keyboard,ui_SSIDInputText);
 lv_obj_add_event_cb(ui_Keyboard, ui_event_Keyboard, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_landingBackButton, ui_event_landingBackButton, LV_EVENT_ALL, NULL);
+uic_VictronCheckbox = ui_VictronCheckbox;
 
 }
 
@@ -305,5 +328,8 @@ ui_Keyboard= NULL;
 ui_landingBackButton= NULL;
 ui_aeLandingBottomLabel= NULL;
 ui_aeLandingBottomIcon= NULL;
+uic_VictronCheckbox= NULL;
+ui_VictronCheckbox= NULL;
+ui_VictronCheckboxLabel= NULL;
 
 }
