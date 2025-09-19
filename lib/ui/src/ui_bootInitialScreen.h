@@ -34,7 +34,10 @@ extern void ui_event_landingBackButton( lv_event_t * e);
 extern lv_obj_t *ui_landingBackButton;
 extern lv_obj_t *ui_aeLandingBottomLabel;
 extern lv_obj_t *ui_aeLandingBottomIcon;
+extern lv_obj_t *ui_VictronCheckbox;
+extern lv_obj_t *ui_VictronCheckboxLabel;
 // CUSTOM VARIABLES
+extern lv_obj_t *uic_VictronCheckbox;
 
 #ifdef __cplusplus
 } /*extern "C"*/
