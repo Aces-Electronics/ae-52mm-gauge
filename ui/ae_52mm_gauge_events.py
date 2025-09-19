@@ -1,16 +1,19 @@
 
 def toggleWiFi(event_struct):
-    return
+    toggleSettingsView()
 
 
 def settingsButtonPressedFunction(event_struct):
-    return
+    landingBackButtonPressed()
 
 
 def aeLandingIconFunction(event_struct):
-    return
+    toggleSettingsView()
 
 
 def landingBackButtonPressedFunction(event_struct):
-    return
+    landingBackButtonPressed()
+
+def victronCheckboxToggled(event_struct):
+    victronCheckboxClicked()
 

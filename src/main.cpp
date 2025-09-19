@@ -80,6 +80,8 @@ bool disableWiFi = false;
 bool checkIP = false;
 bool wifiSetToOn = false;
 bool settingsState = false;
+bool settingsLandingState = false;
+bool isVictronBleEnabled = false;
 bool toggleIP = true;
 bool SSIDUpdated = false;
 bool SSIDPasswordUpdated = false;
@@ -94,6 +96,8 @@ bool timerRunning = false;
 bool backlightDimmed = false; // Track dim state
 
 unsigned long startTime = 0;
+unsigned long lastInteractionTime = 0; // time of last user interaction
+bool firstPacketReceived = false; // flag to ensure screen changes on first packet
 
 const int pwmChannel = 0;    // PWM channel (0-15)
 const int pwmFreq = 5000;    // PWM frequency in Hz
@@ -279,12 +283,28 @@ static void lv_update_shunt_ui_cb(void *user_data)
   lv_label_set_text_fmt(ui_starterBatteryVoltageLabel, "%.2fV", p->starterBatteryVoltage);
 
   enable_ui_batteryScreen = true;
+
+  // Check if we should change the screen
+  unsigned long currentTime = millis();
+  // Check if 60 seconds have passed since the last interaction.
+  bool screenChangeAllowed = (currentTime - lastInteractionTime) > 60000;
+
+  if (!screenChangeAllowed) {
+    Serial.println("Screen change blocked by user interaction lock");
+  }
+
   lv_obj_t *current_screen = lv_scr_act();
   if (current_screen != ui_batteryScreen)
   {
-    screen_change_requested = true;
-    screen_index = 1; // battery screen index
-    bezel_right = true;
+    if (screenChangeAllowed || !firstPacketReceived) {
+      screen_change_requested = true;
+      screen_index = 1; // battery screen index
+      bezel_right = true;
+      if (!firstPacketReceived)
+      {
+        firstPacketReceived = true; // Set the flag so this only runs once
+      }
+    }
   }
 
   // --- Start/refresh mesh indicator blinking for MESH_DURATION_MS ---
@@ -449,6 +469,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 
     data->point.x = (uint16_t)touchX;
     data->point.y = (uint16_t)touchY;
+    lastInteractionTime = millis(); // Update last interaction time on touch
   }
   else
   {
@@ -505,6 +526,56 @@ void page_1()
 static void updateTopStatus(String text)
 { // ToDo: fix this
   lv_label_set_text(ui_feedbackLabel, text.c_str());
+}
+
+void toggleSettingsView() {
+    Serial.println("toggleSettingsView called");
+    settingsLandingState = !settingsLandingState;
+
+    if (settingsLandingState) {
+        Serial.println("Entering settings view");
+        // In settings view, hide landing elements and show settings elements
+        if(ui_aeLandingIcon) lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeLandingTitle) lv_obj_add_flag(ui_aeLandingTitle, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeLandingBottomLabel) lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+
+        if(ui_settingsTitle) lv_obj_clear_flag(ui_settingsTitle, LV_OBJ_FLAG_HIDDEN);
+        if(ui_VictronCheckbox) lv_obj_clear_flag(ui_VictronCheckbox, LV_OBJ_FLAG_HIDDEN);
+        if(ui_backButton) lv_obj_clear_flag(ui_backButton, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        Serial.println("Exiting settings view");
+        // In landing view, show landing elements and hide settings elements
+        if(ui_aeLandingIcon) lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeLandingTitle) lv_obj_clear_flag(ui_aeLandingTitle, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeLandingBottomLabel) lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+
+        if(ui_settingsTitle) lv_obj_add_flag(ui_settingsTitle, LV_OBJ_FLAG_HIDDEN);
+        if(ui_VictronCheckbox) lv_obj_add_flag(ui_VictronCheckbox, LV_OBJ_FLAG_HIDDEN);
+        if(ui_backButton) lv_obj_add_flag(ui_backButton, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void landingBackButtonPressed() {
+    Serial.println("landingBackButtonPressed called");
+    if (settingsLandingState) {
+        toggleSettingsView(); // This will toggle the state and update the UI
+    }
+}
+
+void updateDataSourcePreference() {
+    preferences.begin("ae", false);
+    preferences.putBool("p_victronBle", isVictronBleEnabled);
+    preferences.end();
+}
+
+void victronCheckboxToggled(lv_event_t * e) {
+    victronCheckboxClicked();
+}
+
+void victronCheckboxClicked() {
+    isVictronBleEnabled = !isVictronBleEnabled;
+    Serial.printf("victronCheckboxClicked called via event, isVictronBleEnabled is now: %d\n", isVictronBleEnabled);
+    updateDataSourcePreference();
 }
 
 void updateWiFiState()
@@ -648,6 +719,9 @@ void Task_main(void *pvParameters)
       // 10 seconds have elapsed, do something here
       screen_index = 0; // reset the encoder counter ater 10 seconds
       // bleHandler.startScan(5); // ToDo: enable BLE or AE mesh, one only
+      if (isVictronBleEnabled) {
+        bleHandler.startScan(5);
+      }
       timerRunning = false; // Reset timer if you want to run again
     }
 
@@ -673,6 +747,7 @@ void Task_main(void *pvParameters)
       bezel_right = (action == ENC_CW);
       bezel_left = (action == ENC_CCW);
       screen_change_requested = true;
+      lastInteractionTime = millis(); // Update last interaction time on encoder rotation
       break;
     }
 
@@ -749,6 +824,7 @@ void setup()
 
   preferences.begin("ae", true);
   wifiSetToOn = preferences.getBool("p_wifiOn");
+  isVictronBleEnabled = preferences.getBool("p_victronBle", false);
   SSID = preferences.getString("p_ssid", "no_p_ssid");
   PWD = preferences.getString("p_pwd", "no_p_pwd");
   preferences.end();
@@ -784,7 +860,9 @@ void setup()
   }
 
   // Register for a callback function that will be called when data is received
-  esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
+  if (!isVictronBleEnabled) {
+    esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
+  }
 
   String LVGL_Arduino = "Hello from an AE 52mm Gauge using LVGL: ";
   LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
@@ -819,6 +897,11 @@ void setup()
   lv_indev_drv_register(&indev_drv);
 
   ui_init();
+
+  // Add event handler for Victron checkbox
+  if (ui_VictronCheckbox) {
+    lv_obj_add_event_cb(ui_VictronCheckbox, victronCheckboxToggled, LV_EVENT_VALUE_CHANGED, NULL);
+  }
 
   updateWiFiState();
 
