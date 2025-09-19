@@ -92,6 +92,9 @@ bool enable_ui_coolantScreen = false;
 bool enable_ui_turboExhaustScreen = false;
 bool timerRunning = false;
 bool backlightDimmed = false; // Track dim state
+unsigned long last_user_interaction_time = 0;
+bool user_has_interacted = false;
+bool receiveBleData = false;
 
 unsigned long startTime = 0;
 
@@ -278,13 +281,16 @@ static void lv_update_shunt_ui_cb(void *user_data)
   // lv_label_set_text_fmt(ui_battPowerLabel, "%.2f W", p->batteryPower);
   lv_label_set_text_fmt(ui_starterBatteryVoltageLabel, "%.2fV", p->starterBatteryVoltage);
 
-  enable_ui_batteryScreen = true;
-  lv_obj_t *current_screen = lv_scr_act();
-  if (current_screen != ui_batteryScreen)
+  if ((millis() - last_user_interaction_time > 60000) || !user_has_interacted)
   {
-    screen_change_requested = true;
-    screen_index = 1; // battery screen index
-    bezel_right = true;
+    enable_ui_batteryScreen = true;
+    lv_obj_t *current_screen = lv_scr_act();
+    if (current_screen != ui_batteryScreen)
+    {
+      screen_change_requested = true;
+      screen_index = 1; // battery screen index
+      bezel_right = true;
+    }
   }
 
   // --- Start/refresh mesh indicator blinking for MESH_DURATION_MS ---
@@ -331,47 +337,49 @@ static void lv_update_shunt_ui_cb(void *user_data)
 // Callback when data is received
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
-
-  uint8_t type = incomingData[0];
-
-  Serial.print("Case: ");
-  Serial.println(type);
-
-  switch (type)
+  if (!receiveBleData)
   {
-  case 11: // message ID 1 - AE Smart Shunt
-  {
-    Serial.println("Received AE-Smart-Shunt data");
+    uint8_t type = incomingData[0];
 
-    // Defensive copy: zero target and copy up to struct size
-    struct_message_ae_smart_shunt_1 tmp;
-    memset(&tmp, 0, sizeof(tmp));
-    size_t toCopy = len < (int)sizeof(tmp) ? len : sizeof(tmp);
-    memcpy(&tmp, incomingData, toCopy);
-    tmp.runFlatTime[sizeof(tmp.runFlatTime) - 1] = '\0'; // ensure NUL
+    Serial.print("Case: ");
+    Serial.println(type);
 
-    // Debug
-    Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
-                  tmp.batteryVoltage,
-                  tmp.batteryCurrent,
-                  tmp.batteryPower,
-                  tmp.batterySOC * 100.0f,
-                  tmp.batteryCapacity,
-                  tmp.runFlatTime);
-
-    // Allocate a copy on the heap for the async callback.
-    struct_message_ae_smart_shunt_1 *p = (struct_message_ae_smart_shunt_1 *)malloc(sizeof(*p));
-    if (p == NULL)
+    switch (type)
     {
-      Serial.println("Failed to allocate memory for shunt update");
-      break;
-    }
-    memcpy(p, &tmp, sizeof(*p));
+    case 11: // message ID 1 - AE Smart Shunt
+    {
+      Serial.println("Received AE-Smart-Shunt data");
 
-    // Schedule LVGL-safe update (runs in LVGL thread)
-    lv_async_call(lv_update_shunt_ui_cb, (void *)p);
-  }
-  break;
+      // Defensive copy: zero target and copy up to struct size
+      struct_message_ae_smart_shunt_1 tmp;
+      memset(&tmp, 0, sizeof(tmp));
+      size_t toCopy = len < (int)sizeof(tmp) ? len : sizeof(tmp);
+      memcpy(&tmp, incomingData, toCopy);
+      tmp.runFlatTime[sizeof(tmp.runFlatTime) - 1] = '\0'; // ensure NUL
+
+      // Debug
+      Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
+                    tmp.batteryVoltage,
+                    tmp.batteryCurrent,
+                    tmp.batteryPower,
+                    tmp.batterySOC * 100.0f,
+                    tmp.batteryCapacity,
+                    tmp.runFlatTime);
+
+      // Allocate a copy on the heap for the async callback.
+      struct_message_ae_smart_shunt_1 *p = (struct_message_ae_smart_shunt_1 *)malloc(sizeof(*p));
+      if (p == NULL)
+      {
+        Serial.println("Failed to allocate memory for shunt update");
+        break;
+      }
+      memcpy(p, &tmp, sizeof(*p));
+
+      // Schedule LVGL-safe update (runs in LVGL thread)
+      lv_async_call(lv_update_shunt_ui_cb, (void *)p);
+    }
+    break;
+    }
   }
 }
 
@@ -449,6 +457,8 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 
     data->point.x = (uint16_t)touchX;
     data->point.y = (uint16_t)touchY;
+    last_user_interaction_time = millis();
+    user_has_interacted = true;
   }
   else
   {
@@ -647,7 +657,10 @@ void Task_main(void *pvParameters)
     {
       // 10 seconds have elapsed, do something here
       screen_index = 0; // reset the encoder counter ater 10 seconds
-      // bleHandler.startScan(5); // ToDo: enable BLE or AE mesh, one only
+      if (receiveBleData)
+      {
+        bleHandler.startScan(5); // ToDo: enable BLE or AE mesh, one only
+      }
       timerRunning = false; // Reset timer if you want to run again
     }
 
@@ -660,10 +673,14 @@ void Task_main(void *pvParameters)
     case SINGLE_PRESS:
       Serial.println("Single Pressed");
       toggleBacklightDim();
+      last_user_interaction_time = millis();
+      user_has_interacted = true;
       break;
 
     case LONG_PRESS:
       Serial.println("Long Pressed");
+      last_user_interaction_time = millis();
+      user_has_interacted = true;
       break;
 
     case ENC_CW:
@@ -673,6 +690,8 @@ void Task_main(void *pvParameters)
       bezel_right = (action == ENC_CW);
       bezel_left = (action == ENC_CCW);
       screen_change_requested = true;
+      last_user_interaction_time = millis();
+      user_has_interacted = true;
       break;
     }
 
@@ -751,6 +770,7 @@ void setup()
   wifiSetToOn = preferences.getBool("p_wifiOn");
   SSID = preferences.getString("p_ssid", "no_p_ssid");
   PWD = preferences.getString("p_pwd", "no_p_pwd");
+  receiveBleData = preferences.getBool("p_receiveBle", false);
   preferences.end();
 
   if (wifiSetToOn)
@@ -826,6 +846,15 @@ void setup()
 
   xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 3, NULL, 0);
   xTaskCreatePinnedToCore(Task_main, "Task_main", 40960, NULL, 3, NULL, 1);
+}
+
+void victronCheckboxToggled(lv_event_t *e)
+{
+    lv_obj_t *checkbox = lv_event_get_target(e);
+    receiveBleData = lv_obj_has_state(checkbox, LV_STATE_CHECKED);
+    preferences.begin("ae", false);
+    preferences.putBool("p_receiveBle", receiveBleData);
+    preferences.end();
 }
 
 void loop()

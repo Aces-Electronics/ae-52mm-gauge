@@ -35,6 +35,9 @@ lv_disp_set_theme(dispp, theme);
 ui_bootInitialScreen_screen_init();
 ui_batteryScreen_screen_init();
 ui____initial_actions0 = lv_obj_create(NULL);
+lv_obj_add_event_cb(ui_VictronCheckbox, victronCheckboxToggled, LV_EVENT_VALUE_CHANGED, NULL);
+lv_obj_add_flag(ui_VictronCheckbox, LV_OBJ_FLAG_HIDDEN);
+lv_obj_add_flag(ui_VictronCheckboxLabel, LV_OBJ_FLAG_HIDDEN);
 lv_disp_load_scr( ui_bootInitialScreen);
 }
 
