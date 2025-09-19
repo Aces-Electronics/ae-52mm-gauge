@@ -8,6 +8,7 @@
 #include "../../src/shared_data.h"
 #include <string.h> // For strcmp
 
+extern bool receiveBleData;
 extern bool wifiSetToOn;
 extern bool settingsState;
 extern bool syncFlash;
@@ -92,6 +93,8 @@ void landingBackButtonPressedFunction(lv_event_t *e)
 		lv_obj_add_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_VictronCheckbox, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_VictronCheckboxLabel, LV_OBJ_FLAG_HIDDEN);
 
 		lv_obj_clear_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
@@ -125,5 +128,26 @@ void landingBackButtonPressedFunction(lv_event_t *e)
 
 void aeLandingIconFunction(lv_event_t *e)
 {
-	// Your code here
+	// Hide landing page icons
+	lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+
+	// Show settings elements
+	lv_label_set_text(ui_feedbackLabel, "Data Source");
+	lv_obj_clear_flag(ui_VictronCheckbox, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_clear_flag(ui_VictronCheckboxLabel, LV_OBJ_FLAG_HIDDEN);
+	lv_label_set_text(ui_VictronCheckboxLabel, "Enable Victron BLE"); // Fix the label text
+	lv_obj_align_to(ui_VictronCheckboxLabel, ui_VictronCheckbox, LV_ALIGN_OUT_RIGHT_MID, 10, 0); // Align label to checkbox
+
+	lv_obj_clear_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
+
+	// Set checkbox state from preferences
+	if (receiveBleData) {
+		lv_obj_add_state(ui_VictronCheckbox, LV_STATE_CHECKED);
+	} else {
+		lv_obj_clear_state(ui_VictronCheckbox, LV_STATE_CHECKED);
+	}
 }
