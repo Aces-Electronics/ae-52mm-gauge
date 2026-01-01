@@ -119,6 +119,16 @@ struct_message_voltage0 localVoltage0Struct;
 BLEHandler bleHandler(&localVoltage0Struct);
 esp_now_peer_info_t peerInfo;
 
+// Device tracking for Landing Page
+#include <map>
+#include <string>
+struct DeviceInfo {
+    String type;
+    uint32_t lastSeen;
+};
+std::map<String, DeviceInfo> connectedDevices;
+
+
 // Mesh indicator / heartbeat UI helpers
 static lv_timer_t *g_mesh_timer = NULL;
 static uint32_t g_mesh_expire_ms = 0; // millis when mesh blinking should stop
@@ -206,8 +216,8 @@ static void heartbeat_timer_cb(lv_timer_t *timer)
 
 void update_c_strings()
 {
-  SSID_c = SSID_cpp.c_str();
-  PWD_c = PWD_cpp.c_str();
+  SSID_c = SSID.c_str();
+  PWD_c = PWD.c_str();
 }
 
 void setBacklightBrightness(uint8_t brightness)
@@ -241,11 +251,14 @@ static void lv_update_shunt_ui_cb(void *user_data)
     return;
 
   // Use the same UI updates you used in Task_TFT, running here in LVGL context.
-  lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-  lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE-Shunt: %.2fV  %.2fA  %.2fW",
-                        p->batteryVoltage,
-                        p->batteryCurrent,
-                        p->batteryPower);
+  // Check if we should update the landing label (only if not scrolling through devices)
+  if (screen_index > 0) {
+      lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+      lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE-Shunt: %.2fV  %.2fA  %.2fW",
+                            p->batteryVoltage,
+                            p->batteryCurrent,
+                            p->batteryPower);
+  }
 
   Serial.printf("Local Shunt: %.2fV %.2fA %.2fW %.fSOC %.2fAh %s\n",
     p->batteryVoltage,
@@ -341,6 +354,12 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
   case 11: // message ID 1 - AE Smart Shunt
   {
     Serial.println("Received AE-Smart-Shunt data");
+    
+    // Update connected devices map
+    char macStr[18];
+    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
 
     // Defensive copy: zero target and copy up to struct size
     struct_message_ae_smart_shunt_1 tmp;
@@ -607,24 +626,49 @@ void Task_TFT(void *pvParameters)
       screen_change_requested = false;
 
       // Example logic for screen_index based on screen_index
+      // Logic for screen_index clamping and Landing Page scrolling
+      int min_index = -(int)connectedDevices.size();
       if (screen_index > 1)
         screen_index = 1;
-      else if (screen_index < 0)
-        screen_index = 0;
+      else if (screen_index < min_index)
+        screen_index = min_index;
+      
+      // Update label if on Landing Page (<= 0)
+      if (screen_index <= 0) {
+          lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+          if (screen_index == 0) {
+               lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE Network: %d Device(s) Found", connectedDevices.size());
+          } else {
+               // Negative index: show specific device
+               int target = -screen_index - 1; // 0-based index for map
+               int current = 0;
+               for (std::map<String, DeviceInfo>::iterator it = connectedDevices.begin(); it != connectedDevices.end(); ++it) {
+                   if (current == target) {
+                       lv_label_set_text_fmt(ui_aeLandingBottomLabel, "Device: %s", it->second.type.c_str());
+                       break;
+                   }
+                   current++;
+               }
+          }
+      }
 
       Serial.printf("Screen change case: %d\n", screen_index);
 
       switch (screen_index)
       {
       case 0:
-        changeScreen(ui_bootInitialScreen, enable_ui_bootInitialScreen, "Boot Initial Screen");
+      default: // Handle negative indices as Landing Page
+        if (screen_index <= 0) {
+            changeScreen(ui_bootInitialScreen, enable_ui_bootInitialScreen, "Boot Initial Screen");
+        } else {
+             // Fallback
+            changeScreen(ui_bootInitialScreen, enable_ui_bootInitialScreen, "Boot Initial Screen");
+        }
         break;
       case 1:
         changeScreen(ui_batteryScreen, enable_ui_batteryScreen, "Battery Screen");
         break;
-      default:
-        Serial.println("Unknown screen index");
-        break;
+
       }
     }
     vTaskDelay(10);
@@ -714,6 +758,7 @@ void Task_main(void *pvParameters)
       preferences.begin("ae", false);
       preferences.putString("p_ssid", SSID);
       preferences.end();
+      update_c_strings();
       SSIDUpdated = false;
     }
 
@@ -722,18 +767,19 @@ void Task_main(void *pvParameters)
       preferences.begin("ae", false);
       preferences.putString("p_pwd", PWD);
       preferences.end();
+      update_c_strings();
       SSIDPasswordUpdated = false;
     }
 
     loopCounter++;
-    if (loopCounter > 50) // ~ 5 seconds
+    if (loopCounter > 500) // ~ 5 seconds (at 10ms delay)
     {
       toggleIP = !toggleIP;
       updateWiFiState();
       loopCounter = 0;
     }
 
-    vTaskDelay(100);
+    vTaskDelay(10);
   }
 }
 
@@ -751,6 +797,8 @@ void setup()
   SSID = preferences.getString("p_ssid", "no_p_ssid");
   PWD = preferences.getString("p_pwd", "no_p_pwd");
   preferences.end();
+
+  update_c_strings();
 
   if (wifiSetToOn)
   {

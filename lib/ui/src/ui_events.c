@@ -19,13 +19,20 @@ void toggleWiFi(lv_event_t *e)
 	if (!settingsState) // on the landing page, AKA not in settings
 	{
 		LV_LOG_USER("CHECKING IF WIFI CAN BE TURNED ON");
-		if ((strcmp(PWD_c, "none") == 0) || wifiSetToOn)
+
+		// Check if WiFi is properly configured
+		if (PWD_c == NULL || strcmp(PWD_c, "none") == 0 || strcmp(PWD_c, "no_p_pwd") == 0)
+		{
+			LV_LOG_USER("WIFI NOT CONFIGURED - REDIRECTING TO SETTINGS");
+			settingsButtonPressedFunction(e);
+			toggleWiFi(e); // Recursive call to enter the WiFi settings sub-menu
+			_ui_label_set_property(ui_feedbackLabel, _UI_LABEL_PROPERTY_TEXT, "CONFIGURE WIFI");
+			return;
+		}
+
+		if (wifiSetToOn)
 		{
 			lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
-			if (strcmp(PWD_c, "none") == 0)
-			{
-				LV_LOG_USER("WIFI NOT CONFIGURED");
-			}
 			LV_LOG_USER("WIFI SET TO OFF");
 			wifiSetToOn = false;
 			syncFlash = true;
@@ -36,8 +43,8 @@ void toggleWiFi(lv_event_t *e)
 			wifiSetToOn = true;
 			connectWiFi = true;
 			lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
-			LV_LOG_USER("%s", SSID_c);
-			LV_LOG_USER("%s", PWD_c);
+			if (SSID_c != NULL) LV_LOG_USER("%s", SSID_c);
+			if (PWD_c != NULL) LV_LOG_USER("%s", PWD_c);
 			lv_label_set_text(ui_feedbackLabel, "");
 			lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
 			syncFlash = true;
@@ -92,13 +99,13 @@ void landingBackButtonPressedFunction(lv_event_t *e)
 		lv_obj_add_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_SSIDPasswordLabel, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_landingBackButton, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
 
 		lv_obj_clear_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
 
 		lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_clear_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
 
 		lv_img_set_src(ui_settingsIcon, &ui_img_501072417);			// settings Icon
 		lv_img_set_src(ui_aeLandingIcon, &ui_img_ae_white_128_png); // AE Landing Icon
