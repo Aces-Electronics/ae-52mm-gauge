@@ -14,6 +14,11 @@
 #include "passwords.h"
 #include "ble_handler.h"
 #include "encoder.h"
+#include "pairing_handler.h"
+
+PairingHandler pairingHandler;
+bool g_isPaired = false;
+uint8_t g_pairedMac[6] = {0};
 
 String SSID_cpp = "MySSID";
 String PWD_cpp = "MyPassword";
@@ -127,6 +132,240 @@ struct DeviceInfo {
     uint32_t lastSeen;
 };
 std::map<String, DeviceInfo> connectedDevices;
+
+// Helper to parse MAC string to bytes
+void parseBytes(const char* str, char sep, byte* bytes, int maxBytes, int base) {
+    for (int i = 0; i < maxBytes; i++) {
+        bytes[i] = strtoul(str, NULL, base);
+        str = strchr(str, sep);
+        if (str == NULL || *str == '\0') break;
+        str++;
+    }
+}
+
+// Global flag for Scanning Mode (Server Listening)
+bool g_scanningMode = false;
+
+void addBroadcastPeer() {
+    if (esp_now_is_peer_exist(broadcastAddress)) return;
+    esp_now_peer_info_t peer;
+    memset(&peer, 0, sizeof(peer));
+    memcpy(peer.peer_addr, broadcastAddress, 6);
+    peer.channel = 0;
+    peer.encrypt = false;
+    if (esp_now_add_peer(&peer) != ESP_OK) Serial.println("Failed to add Broadcast Peer");
+    else Serial.println("Broadcast Peer Added (Scanning Enabled)");
+}
+
+void removeBroadcastPeer() {
+    if (esp_now_is_peer_exist(broadcastAddress)) {
+        esp_now_del_peer(broadcastAddress);
+        Serial.println("Broadcast Peer Removed (Scanning Disabled)");
+    }
+}
+
+void hexStringToBytes(String hex, uint8_t* bytes, int len) {
+    for (int i=0; i<len; i++) {
+        char buf[3] = { hex[i*2], hex[i*2+1], '\0' };
+        bytes[i] = (uint8_t)strtoul(buf, NULL, 16);
+    }
+}
+
+// Queue for QR Code drawing
+bool g_showQR = false;
+String g_qrPayload = "";
+
+// Helper to generate QR logic (Moved from startPairingProcess)
+void executePairing(String targetMacStr) {
+    if (targetMacStr == "") return;
+    
+    Serial.printf("Executing Pairing for: %s\n", targetMacStr.c_str());
+
+     // 1. Generate Key
+    pairingHandler.generateNewKey();
+    const uint8_t* key = pairingHandler.getKey();
+
+    // 2. Add Encrypted Peer
+    uint8_t macBytes[6];
+    parseBytes(targetMacStr.c_str(), ':', macBytes, 6, 16);
+    
+    // Remove if exists
+    if (esp_now_is_peer_exist(macBytes)) {
+        esp_now_del_peer(macBytes);
+    }
+
+    esp_now_peer_info_t securePeer;
+    memset(&securePeer, 0, sizeof(securePeer));
+    memcpy(securePeer.peer_addr, macBytes, 6);
+    securePeer.channel = 0;
+    securePeer.encrypt = true;
+    memcpy(securePeer.lmk, key, 16);
+
+    if (esp_now_add_peer(&securePeer) != ESP_OK) {
+        Serial.println("Failed to add secure peer!");
+        return;
+    }
+
+    // 3. Save to Preferences (NVS)
+    preferences.begin("peers", false);
+    String keyHex = "";
+    for (int i=0; i<16; i++) {
+        char buf[3];
+        sprintf(buf, "%02X", key[i]);
+        keyHex += buf;
+    }
+    // NVS Key max 15 chars. MAC is 17. Strip colons -> 12 chars.
+    String macKey = targetMacStr;
+    macKey.replace(":", ""); 
+    preferences.putString(macKey.c_str(), keyHex);
+    // STORE THE CURRENT PAIRED DEVICE as "p_paired_mac"
+    preferences.putString("p_paired_mac", targetMacStr); 
+    preferences.end();
+    
+    // Update global state
+    memcpy(g_pairedMac, macBytes, 6);
+    g_isPaired = true;
+
+    // 4. Generate QR Payload
+    String gaugeMac = WiFi.macAddress();
+    String payload = pairingHandler.getPairingString(gaugeMac, targetMacStr);
+    
+    // 5. Hide UI Elements (including local list if any)
+    if (ui_feedbackLabel) lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+    if (ui_settingsIcon) lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+    if (ui_wifiIcon) lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+    if (ui_aeLandingIcon) lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+    if (ui_aeLandingBottomLabel) lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+    if (ui_aeLandingBottomIcon) lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
+    
+    // Set flag and payload for Task_TFT to handle
+    g_qrPayload = payload;
+    g_showQR = true;
+    Serial.println("Pairing Process Initiated. Waiting for render task...");
+}
+
+extern "C" void hideQRCode() {
+    g_showQR = false;
+    // Force a full redraw to clear the direct TFT pixels
+    if (lv_scr_act()) {
+        lv_obj_invalidate(lv_scr_act());
+    }
+}
+
+// Global reference to the list object to delete it later
+lv_obj_t *g_pairingList = NULL;
+
+// Timer to refresh the pairing list during scanning
+static lv_timer_t *g_scan_refresh_timer = NULL;
+
+static void pairing_list_event_handler(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t * obj = lv_event_get_target(e);
+    if(code == LV_EVENT_CLICKED) {
+        const char* txt = lv_list_get_btn_text(g_pairingList, obj);
+        if (txt != NULL) {
+            String label = String(txt);
+            // Format: "Type (MAC)"
+            int start = label.lastIndexOf('(');
+            int end = label.lastIndexOf(')');
+            if (start > 0 && end > start) {
+                String mac = label.substring(start + 1, end);
+                // Hide/Delete List and Stop Scanning
+                if (g_pairingList) {
+                    lv_obj_del(g_pairingList);
+                    g_pairingList = NULL;
+                }
+                // g_scanningMode = false; // KEEP TRUE until Data Arrives!
+                if (g_scan_refresh_timer) {
+                    lv_timer_del(g_scan_refresh_timer);
+                    g_scan_refresh_timer = NULL;
+                }
+                executePairing(mac);
+                
+                // Now that we are paired, remove the broadcast listener
+                if (g_isPaired) {
+                    removeBroadcastPeer();
+                }
+            }
+        }
+    }
+}
+
+// Timer to refresh the pairing list during scanning
+
+static void scan_refresh_timer_cb(lv_timer_t * timer) {
+    if (!g_pairingList) {
+        lv_timer_del(timer);
+        g_scan_refresh_timer = NULL;
+        return;
+    }
+    
+    // Simple approach: Clean list and rebuild (except header/close if possible, but easier to rebuild all)
+    // Actually, cleaning list is flickering.
+    // Better: Just append new ones? Or just rebuild. Rebuild is safer.
+    
+    lv_obj_clean(g_pairingList);
+    lv_list_add_text(g_pairingList, "Select Device (Scanning...)");
+    
+    for (auto const& pair : connectedDevices) {
+        String mac = pair.first;
+        DeviceInfo info = pair.second;
+        String label = info.type + " (" + mac + ")";
+        lv_obj_t * btn = lv_list_add_btn(g_pairingList, LV_SYMBOL_WIFI, label.c_str());
+        lv_obj_add_event_cb(btn, pairing_list_event_handler, LV_EVENT_CLICKED, NULL);
+    }
+    
+    // Add close button at bottom
+    lv_obj_t * closeBtn = lv_list_add_btn(g_pairingList, LV_SYMBOL_CLOSE, "Stop Scan & Close");
+    lv_obj_add_event_cb(closeBtn, [](lv_event_t * e){
+        if (g_pairingList) {
+            lv_obj_del(g_pairingList);
+            g_pairingList = NULL;
+        }
+        // Stop Scanning
+        g_scanningMode = false;
+        if (g_scan_refresh_timer) {
+            lv_timer_del(g_scan_refresh_timer);
+            g_scan_refresh_timer = NULL;
+        }
+        
+        // If we are paired, silence the radio again.
+        if (g_isPaired) {
+            removeBroadcastPeer();
+        }
+        
+        Serial.println("Scanning Stopped.");
+    }, LV_EVENT_CLICKED, NULL);
+}
+
+extern "C" void startPairingProcess() {
+    Serial.println("Starting Scan & Pairing Process...");
+    
+    // 1. Enable Radio (Add Broadcast Peer)
+    addBroadcastPeer();
+    
+    // 2. Enable Scanning Mode
+    g_scanningMode = true;
+    connectedDevices.clear(); // Clear old list
+    
+    if (g_pairingList) {
+        lv_obj_del(g_pairingList);
+    }
+
+    // Create a list
+    g_pairingList = lv_list_create(lv_scr_act());
+    lv_obj_set_size(g_pairingList, 300, 300);
+    lv_obj_center(g_pairingList);
+    lv_obj_add_flag(g_pairingList, LV_OBJ_FLAG_FLOATING); 
+
+    // Add title
+    lv_list_add_text(g_pairingList, "Select Device (Scanning...)");
+    
+    // Start Refresh Timer (1Hz)
+    if (g_scan_refresh_timer) lv_timer_del(g_scan_refresh_timer);
+    g_scan_refresh_timer = lv_timer_create(scan_refresh_timer_cb, 1000, NULL);
+}
 
 
 // Mesh indicator / heartbeat UI helpers
@@ -242,6 +481,18 @@ void toggleBacklightDim()
   }
 }
 
+// Helper to map bar value to Y coordinate for floating labels
+// 0 -> 29px
+// +100 -> -42px
+// -100 -> 97px
+static int get_bar_label_y(float value) {
+  if (value >= 0) {
+    return map((long)value, 0, 100, 29, -42);
+  } else {
+    return map((long)value, 0, -100, 29, 97);
+  }
+}
+
 // Async LVGL callback used to update UI from data received in ESP-NOW callback.
 
 static void lv_update_shunt_ui_cb(void *user_data)
@@ -249,6 +500,45 @@ static void lv_update_shunt_ui_cb(void *user_data)
   struct_message_ae_smart_shunt_1 *p = (struct_message_ae_smart_shunt_1 *)user_data;
   if (!p)
     return;
+
+  // AUTO-SWITCH and AUTO-LOCK Logic:
+  
+  // 1. If we are scanning, receiving valid data means we are successfully paired.
+  // We should stop scanning to silence the radio (Hardware Isolation).
+  if (g_scanningMode) {
+     g_scanningMode = false;
+     // Clean up list UI if it exists
+     if (g_pairingList) {
+         lv_obj_del(g_pairingList);
+         g_pairingList = NULL;
+     }
+     if (g_scan_refresh_timer) {
+         lv_timer_del(g_scan_refresh_timer);
+         g_scan_refresh_timer = NULL;
+     }
+     // Enforce Radio Silence
+     removeBroadcastPeer();
+     Serial.println("Valid Data Received -> Auto-Stopped Scanning (Radio Silenced).");
+     
+     // UX Requirement: Go to Landing Page immediately on first packet.
+     // This primes the "Auto-Switch to Gauge" logic for the NEXT packet.
+     screen_index = 0; // Landing Page
+     settingsState = false; // Exit settings mode immediately
+     screen_change_requested = true; 
+     // Serial.println("Navigating to Landing Page to prime for Gauge View.");
+     return; // Wait for next packet to auto-switch to Gauge View
+  }
+
+  // 2. Auto-Switch Screen
+  // Automatically switch to the Gauge View (1) if handling data.
+  // BUT: Do not switch if we are in Settings Mode (prevent interference).
+  // AND: Do not switch if we are ALREADY on the Gauge Screen (1).
+  if (screen_index != 1 && !settingsState) {
+      screen_index = 1;
+      screen_change_requested = true;
+      bezel_right = true; // Animate forward
+      // Serial.println("Auto-Switching to Gauge Screen.");
+  }
 
   // Use the same UI updates you used in Task_TFT, running here in LVGL context.
   // Check if we should update the landing label (only if not scrolling through devices)
@@ -260,44 +550,96 @@ static void lv_update_shunt_ui_cb(void *user_data)
                             p->batteryPower);
   }
 
-  Serial.printf("Local Shunt: %.2fV %.2fA %.2fW %.fSOC %.2fAh %s\n",
+  // Atomic Logging to prevent interleaving
+  char logBuf[512];
+  snprintf(logBuf, sizeof(logBuf), 
+    "\n=== Local Shunt ===\n"
+    "Message ID     : %d\n"
+    "Voltage        : %.2f V\n"
+    "Current        : %.2f A\n"
+    "Power          : %.2f W\n"
+    "SOC            : %.1f %%\n"
+    "Capacity       : %.2f Ah\n"
+    "Starter Voltage: %.2f V\n"
+    "Error          : %d\n"
+    "Run Flat Time  : %s\n"
+    "===================\n",
+    p->messageID,
     p->batteryVoltage,
     p->batteryCurrent,
     p->batteryPower,
     p->batterySOC * 100.0f,
     p->batteryCapacity,
-    p->runFlatTime);
+    p->starterBatteryVoltage,
+    p->batteryState,
+    p->runFlatTime
+  );
+  Serial.print(logBuf);
 
-  if (p->batteryCurrent < -0.15f)
-  {
-    lv_arc_set_range(ui_SBattVArc, 116,144);
-  }
-  else
-  {
-    lv_arc_set_range(ui_SBattVArc, 116,130);
-  }
+  Serial.print(logBuf);
+
+  // Change: Outer Arc now displays SOC (0-100%) instead of Voltage
+  lv_arc_set_range(ui_SBattVArc, 0, 100);
+  lv_arc_set_value(ui_SBattVArc, (int)(p->batterySOC * 100.0f));
 
   lv_label_set_text_fmt(ui_battVLabelSensor, "%05.2f", p->batteryVoltage);
-  lv_arc_set_value(ui_SBattVArc, (int)(p->batteryVoltage * 10));
-
+  
   lv_label_set_text_fmt(ui_battALabelSensor, "%05.2f", p->batteryCurrent);
   lv_arc_set_value(ui_SA1Arc, (int)(p->batteryCurrent));
 
   lv_label_set_text_fmt(ui_SOCLabel, "%.0f%%", p->batterySOC * 100.0f);
 
-  lv_label_set_text_fmt(ui_BatteryTime, "%s", p->runFlatTime);
+  // Starter Battery Display Logic
+  // If voltage is NOT 10.00V (allowing for small float error), checks are active.
+  // Cycle: 3s Voltage -> 3s Status -> 56s Run Flat Time.
+  if (fabs(p->starterBatteryVoltage - 10.0f) > 0.05f) {
+      uint32_t cycleTime = millis() % 62000; // 62 second total cycle
+      
+      if (cycleTime < 3000) {
+          // Phase 1: Show Voltage (0-3s)
+          lv_label_set_text_fmt(ui_BatteryTime, "Starter: %.1fV", p->starterBatteryVoltage);
+          lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
+      } else if (cycleTime < 6000) {
+          // Phase 2: Show Status (3-6s)
+          if (p->starterBatteryVoltage > 11.8f) {
+              lv_label_set_text(ui_BatteryTime, "Starter Good!");
+              lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
+          } else {
+              lv_label_set_text(ui_BatteryTime, "Starter Low!");
+              lv_obj_set_style_text_color(ui_BatteryTime, lv_color_hex(0xFFA500), LV_PART_MAIN); // Orange
+          }
+      } else {
+          // Phase 3: Show Run Flat Time (6-62s)
+          lv_label_set_text_fmt(ui_BatteryTime, "%s", p->runFlatTime);
+          lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
+      }
+  } else {
+      // Starter Battery not connected (10.00V default) - Always show Run Flat Time
+      lv_label_set_text_fmt(ui_BatteryTime, "%s", p->runFlatTime);
+      lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
+  }
 
-  // If you have other labels, update them here:
-  // lv_label_set_text_fmt(ui_battPowerLabel, "%.2f W", p->batteryPower);
+  // Energy Bars Update
+  // Weekly
+  if (ui_BarWeek) {
+      lv_bar_set_value(ui_BarWeek, (int32_t)p->lastWeekWh, LV_ANIM_ON);
+      if (ui_BarWeekLabel) {
+          lv_label_set_text_fmt(ui_BarWeekLabel, "%.0f>", p->lastWeekWh);
+          lv_obj_set_y(ui_BarWeekLabel, get_bar_label_y(p->lastWeekWh));
+      }
+  }
+
+  // Daily
+  if (ui_BarDay) {
+      lv_bar_set_value(ui_BarDay, (int32_t)p->lastDayWh, LV_ANIM_ON);
+      if (ui_BarDayLabel) {
+          lv_label_set_text_fmt(ui_BarDayLabel, "<%.0f", p->lastDayWh);
+          lv_obj_set_y(ui_BarDayLabel, get_bar_label_y(p->lastDayWh));
+      }
+  }
 
   enable_ui_batteryScreen = true;
-  lv_obj_t *current_screen = lv_scr_act();
-  if (current_screen != ui_batteryScreen)
-  {
-    screen_change_requested = true;
-    screen_index = 1; // battery screen index
-    bezel_right = true;
-  }
+  // Redundant logic removed. Auto-switch handled at top of function.
 
   // --- Start/refresh mesh indicator blinking for MESH_DURATION_MS ---
   g_mesh_expire_ms = millis() + MESH_DURATION_MS;
@@ -346,15 +688,38 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 
   uint8_t type = incomingData[0];
 
-  Serial.print("Case: ");
-  Serial.println(type);
+  // Serial.print("Case: ");
+  // Serial.println(type);
 
   switch (type)
   {
-  case 11: // message ID 1 - AE Smart Shunt
+  case 11: // message ID 11 - AE Smart Shunt (Encrypted / Authentic)
   {
-    Serial.println("Received AE-Smart-Shunt data");
+    // Serial.println("Received AE-Smart-Shunt data (ID 11)");
     
+    struct_message_ae_smart_shunt_1 incomingReadings;
+    
+    memcpy(&incomingReadings, incomingData, sizeof(incomingReadings));
+
+  // Protocol Separation Security Check:
+  // If we are strictly paired, we MUST ignore "Discovery Beacons" (ID 33).
+  // ID 33 is only for finding new devices (Scanning Mode).
+  // If we accept ID 33 while paired, a reset/public shunt can overwrite our data.
+  if (g_isPaired && incomingReadings.messageID == 33) {
+      // Serial.println("Ignored: Protocol 33 (Beacon) from Paired Device.");
+      return; 
+  }
+  
+    // Strict Filtering if Paired
+    if (g_isPaired) {
+        if (memcmp(mac, g_pairedMac, 6) != 0) {
+            // Silently ignore or print only if needed
+            // Serial.println("Ignored: Data from non-paired device.");
+            return;
+        }
+    }
+    // else: accept all (Discovery Mode / Legacy)
+
     // Update connected devices map
     char macStr[18];
     snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
@@ -369,13 +734,16 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     tmp.runFlatTime[sizeof(tmp.runFlatTime) - 1] = '\0'; // ensure NUL
 
     // Debug
-    Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
-                  tmp.batteryVoltage,
-                  tmp.batteryCurrent,
-                  tmp.batteryPower,
-                  tmp.batterySOC * 100.0f,
-                  tmp.batteryCapacity,
-                  tmp.runFlatTime);
+    // Debug
+    // Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
+    //               tmp.batteryVoltage,
+    //               tmp.batteryCurrent,
+    //               tmp.batteryPower,
+    //               tmp.batterySOC * 100.0f,
+    //               tmp.batteryCapacity,
+    //               tmp.runFlatTime);
+
+    // Allocate a copy on the heap for the async callback.
 
     // Allocate a copy on the heap for the async callback.
     struct_message_ae_smart_shunt_1 *p = (struct_message_ae_smart_shunt_1 *)malloc(sizeof(*p));
@@ -390,6 +758,22 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     lv_async_call(lv_update_shunt_ui_cb, (void *)p);
   }
   break;
+  
+  case 33: // Discovery Beacon (Sanitized)
+  {
+      if (!g_scanningMode) {
+          // Serial.println("Ignored Beacon: Not in Scanning Mode");
+          return;
+      }
+      
+      // Always update document list for ID 33, but NEVER update UI.
+       char macStr[18];
+        snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
+       // Serial.println("Received Beacon (ID 33) - List Updated");
+      break;
+  }
   }
 }
 
@@ -438,7 +822,7 @@ void changeScreen(lv_obj_t *targetScreen, bool enabled, const char *screenName)
     return;
   }
 
-  Serial.printf("Displaying: %s\n", screenName);
+  // Serial.printf("Displaying: %s\n", screenName);
 }
 
 /* Display flushing */
@@ -621,6 +1005,26 @@ void Task_TFT(void *pvParameters)
   while (1)
   {
     lv_timer_handler();
+
+    if (g_showQR) {
+        g_showQR = false; // Trigger once
+        
+        // Wait for LVGL flush to hopefully finish clearing the hidden widgets
+        delay(100); 
+
+        // 6. Draw QR Code
+        int size = 260; // Increased size
+        int padding = 10;
+        int x = (screenWidth - size) / 2;
+        int y = (screenHeight - size) / 2;
+        
+        // Clear area (White Background)
+        gfx->fillRect(x - padding, y - padding, size + (padding * 2), size + (padding * 2), WHITE);
+        
+        pairingHandler.drawQRCode(gfx, x, y, size, g_qrPayload);
+        Serial.println("QR Code Rendered async.");
+    }
+
     if (screen_change_requested)
     {
       screen_change_requested = false;
@@ -632,6 +1036,10 @@ void Task_TFT(void *pvParameters)
         screen_index = 1;
       else if (screen_index < min_index)
         screen_index = min_index;
+      
+      // Update Scanning Mode Logic:
+      // REMOVED: Auto-Scan on landing page. Now controlled explicitly by 'startPairingProcess'.
+      // g_scanningMode = (screen_index <= 0);
       
       // Update label if on Landing Page (<= 0)
       if (screen_index <= 0) {
@@ -652,7 +1060,7 @@ void Task_TFT(void *pvParameters)
           }
       }
 
-      Serial.printf("Screen change case: %d\n", screen_index);
+      // Serial.printf("Screen change case: %d\n", screen_index);
 
       switch (screen_index)
       {
@@ -818,16 +1226,50 @@ void setup()
     return;
   }
 
-  // Add peer (broadcast). Initialize peerInfo first.
-  memset(&peerInfo, 0, sizeof(peerInfo));
-  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
-  peerInfo.channel = 0; // current channel
-  peerInfo.encrypt = false;
+  // 1. Load Paired Device Info FIRST
+  preferences.begin("peers", true);
+  String pairedMacStr = preferences.getString("p_paired_mac", "");
+  preferences.end();
+  
+  if (pairedMacStr != "") {
+      Serial.printf("Loading Paired Device: %s\n", pairedMacStr.c_str());
+      parseBytes(pairedMacStr.c_str(), ':', g_pairedMac, 6, 16);
+      g_isPaired = true;
+      
+      // Also need to restore Encrypted Peer? 
+      // The pairing key is stored under macKey (stripped colons).
+      String macKey = pairedMacStr;
+      macKey.replace(":", "");
+      
+      preferences.begin("peers", true);
+      String keyHex = preferences.getString(macKey.c_str(), "");
+      preferences.end();
+      
+      if (keyHex.length() == 32) {
+          uint8_t keyBytes[16];
+          hexStringToBytes(keyHex, keyBytes, 16); // Assuming this helper exists or we duplicate it
+          
+          esp_now_peer_info_t securePeer;
+          memset(&securePeer, 0, sizeof(securePeer));
+          memcpy(securePeer.peer_addr, g_pairedMac, 6);
+          securePeer.channel = 0;
+          securePeer.encrypt = true;
+          memcpy(securePeer.lmk, keyBytes, 16);
+          
+          if (esp_now_add_peer(&securePeer) == ESP_OK) {
+              Serial.println("Restored Secure Peer connection.");
+          } else {
+              Serial.println("Failed to restore Secure Peer.");
+          }
+      }
+  }
 
-  if (esp_now_add_peer(&peerInfo) != ESP_OK)
-  {
-    Serial.println("Failed to add peer");
-    // not fatal: continue — broadcasting may still work on some SDKs
+  // 2. Add peer (broadcast) ONLY if not paired.
+  // If paired, we stay silent until user triggers scan.
+  if (!g_isPaired) {
+      addBroadcastPeer();
+  } else {
+      Serial.println("Paired on Boot: Broadcast Peer NOT added (Silent Mode).");
   }
 
   // Register for a callback function that will be called when data is received
@@ -878,4 +1320,13 @@ void setup()
 void loop()
 {
   // not really needed.
+}
+
+extern "C" void AE_StartPairing() {
+    // Force LVGL to update the screen (hiding icons) BEFORE we draw on top of it.
+    lv_refr_now(NULL);
+
+    pairingHandler.generateNewKey();
+    String payload = pairingHandler.getPairingString(WiFi.macAddress(), "FF:FF:FF:FF:FF:FF");
+    pairingHandler.drawQRCode(gfx, 110, 110, 260, payload);
 }

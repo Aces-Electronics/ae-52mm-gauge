@@ -70,14 +70,32 @@ void toggleWiFi(lv_event_t *e)
 	}
 }
 
+extern void AE_StartPairing(void);
+
 void settingsButtonPressedFunction(lv_event_t *e)
 {
 	LV_LOG_USER("SETTINGS BUTTON PRESSED");
+	if (settingsState)
+	{
+		LV_LOG_USER("PAIRING REQUESTED");
+        // Hide icons for Pairing Mode
+        lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+        
+        // Show Spinner
+        lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+
+		AE_StartPairing();
+		return;
+	}
+
 	settingsState = true;
 	if (settingsState)
 	{
 		// lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
-		lv_img_set_src(ui_wifiIcon, &ui_img_943648365);		  // WiFi settings
+		lv_img_set_src(ui_wifiIcon, &ui_img_943648365);       // WiFi settings
 		lv_img_set_src(ui_aeLandingIcon, &ui_img_1749172309); // Gauge settings
 		lv_img_set_src(ui_settingsIcon, &ui_img_2022370193);  // ESP now settings
 
@@ -94,6 +112,9 @@ void landingBackButtonPressedFunction(lv_event_t *e)
 	if (settingsState)
 	{
 		LV_LOG_USER("BACK BUTTON PRESSED");
+        // Invalidate screen to clear any direct drawing (like QR code)
+        lv_obj_invalidate(lv_scr_act());
+
 		lv_obj_add_flag(ui_SSIDInputText, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_SSIDPasswordInputText, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_SSIDLabel, LV_OBJ_FLAG_HIDDEN);
@@ -104,6 +125,10 @@ void landingBackButtonPressedFunction(lv_event_t *e)
 		lv_obj_clear_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+        
+        // Hide Spinner
+        lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
 
 		lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
 

@@ -65,6 +65,11 @@ typedef struct struct_message_ae_smart_shunt_1 {
   float batteryCapacity;
   int batteryState;
   char runFlatTime[40];
+  float starterBatteryVoltage;
+  bool isCalibrated;
+  float lastHourWh;
+  float lastDayWh;
+  float lastWeekWh;
 } __attribute__((packed)) struct_message_ae_smart_shunt_1;
 
 #endif // SHARED_DEFS_H

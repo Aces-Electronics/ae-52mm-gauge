@@ -27,6 +27,12 @@ extern lv_obj_t *ui_Image1;
 extern lv_obj_t *ui_BatteryTime;
 extern lv_obj_t *ui_SOCLabel;
 extern lv_obj_t *ui_meshIndicator;
+extern lv_obj_t *ui_BarWeek;
+extern lv_obj_t *ui_BarWeekLabel;
+extern lv_obj_t *ui_BarWeekBottomLabel;
+extern lv_obj_t *ui_BarDay;
+extern lv_obj_t *ui_BarDayLabel;
+extern lv_obj_t *ui_BarDayBottomLabel;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus
