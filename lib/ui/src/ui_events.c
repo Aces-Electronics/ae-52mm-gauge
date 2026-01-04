@@ -70,7 +70,7 @@ void toggleWiFi(lv_event_t *e)
 	}
 }
 
-extern void AE_StartPairing(void);
+extern void startPairingProcess(void);
 
 void settingsButtonPressedFunction(lv_event_t *e)
 {
@@ -85,9 +85,10 @@ void settingsButtonPressedFunction(lv_event_t *e)
         lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
         
         // Show Spinner
-        lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+        // lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN); // Spinner causes artifacts (black square) over QR code
 
-		AE_StartPairing();
+
+		startPairingProcess();
 		return;
 	}
 
@@ -151,6 +152,11 @@ void landingBackButtonPressedFunction(lv_event_t *e)
 		{
 			lv_img_set_src(ui_wifiIcon, &ui_img_2104900491); // WiFi off
 		}
+        
+        // Reset "Done" back to "Back" for next time
+        if (ui_landingBackButton) {
+            lv_label_set_text(ui_landingBackButton, "Back");
+        }
 	}
 	settingsState = false;
 }

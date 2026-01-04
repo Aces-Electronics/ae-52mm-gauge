@@ -46,7 +46,9 @@ const char *PWD_c = nullptr;
 #define DT 10
 #define SW 14
 
-Encoder e(CLK, DT, SW);
+// Encoder e(CLK, DT, SW, debounce, longPressLength)
+// Set Long Press to 3000ms (3 seconds) for Factory Reset safety
+Encoder e(CLK, DT, SW, 4, 3000);
 
 uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -146,6 +148,14 @@ void parseBytes(const char* str, char sep, byte* bytes, int maxBytes, int base) 
 // Global flag for Scanning Mode (Server Listening)
 bool g_scanningMode = false;
 
+// Cached data for Starter Battery Animation
+// Since telemetry arrives every 10s, we cannot drive the 3s/3s cycle from the data callback.
+// We must cache the data and use a high-frequency timer.
+char g_cachedRunFlatTime[40] = "Calculating...";
+float g_cachedStarterVoltage = 10.00f; // Default "disconnected"
+lv_timer_t *g_starterAnimationTimer = NULL;
+
+
 void addBroadcastPeer() {
     if (esp_now_is_peer_exist(broadcastAddress)) return;
     esp_now_peer_info_t peer;
@@ -229,6 +239,9 @@ void executePairing(String targetMacStr) {
     // 4. Generate QR Payload
     String gaugeMac = WiFi.macAddress();
     String payload = pairingHandler.getPairingString(gaugeMac, targetMacStr);
+    
+    Serial.printf("QR GENERATED:\n  Target Shunt MAC: %s\n  Gauge MAC: %s\n  Payload: %s\n", 
+                  targetMacStr.c_str(), gaugeMac.c_str(), payload.c_str());
     
     // 5. Hide UI Elements (including local list if any)
     if (ui_feedbackLabel) lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
@@ -481,17 +494,47 @@ void toggleBacklightDim()
   }
 }
 
-// Helper to map bar value to Y coordinate for floating labels
-// 0 -> 29px
-// +100 -> -42px
-// -100 -> 97px
-static int get_bar_label_y(float value) {
-  if (value >= 0) {
-    return map((long)value, 0, 100, 29, -42);
+// get_bar_label_y removed
+
+// Timer Callback for Smooth Starter Battery Animation
+static void update_battery_label_timer_cb(lv_timer_t *timer)
+{
+  if (!ui_BatteryTime) return;
+
+  // Starter Battery Display Logic
+  // If voltage is NOT 10.00V (allowing for small float error), checks are active.
+  // Cycle: 3s Voltage -> 3s Status -> 56s Run Flat Time.
+  if (fabs(g_cachedStarterVoltage - 10.0f) > 0.05f) {
+      uint32_t cycleTime = millis() % 62000; // 62 second total cycle
+      
+      if (cycleTime < 3000) {
+          // Phase 1: Show Voltage (0-3s)
+          lv_label_set_text_fmt(ui_BatteryTime, "Starter: %.1fV", g_cachedStarterVoltage);
+          lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
+      } else if (cycleTime < 6000) {
+          // Phase 2: Show Status (3-6s)
+          if (g_cachedStarterVoltage > 11.8f) {
+              lv_label_set_text(ui_BatteryTime, "Starter Good!");
+              lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
+          } else {
+              lv_label_set_text(ui_BatteryTime, "Starter Low!");
+              lv_obj_set_style_text_color(ui_BatteryTime, lv_color_hex(0xFFA500), LV_PART_MAIN); // Orange
+          }
+      } else {
+          // Phase 3: Show Run Flat Time (6-62s)
+          lv_label_set_text_fmt(ui_BatteryTime, "%s", g_cachedRunFlatTime);
+          lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
+      }
   } else {
-    return map((long)value, 0, -100, 29, 97);
+      // Starter Battery not connected (10.00V default) - Always show Run Flat Time
+      // Only update if text is different to avoid unnecessary rendering ops
+      // But LVGL handles that check efficiently usually.
+      lv_label_set_text_fmt(ui_BatteryTime, "%s", g_cachedRunFlatTime);
+      lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
   }
 }
+
+// format_energy_label removed
 
 // Async LVGL callback used to update UI from data received in ESP-NOW callback.
 
@@ -503,31 +546,15 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   // AUTO-SWITCH and AUTO-LOCK Logic:
   
-  // 1. If we are scanning, receiving valid data means we are successfully paired.
-  // We should stop scanning to silence the radio (Hardware Isolation).
-  if (g_scanningMode) {
-     g_scanningMode = false;
-     // Clean up list UI if it exists
-     if (g_pairingList) {
-         lv_obj_del(g_pairingList);
-         g_pairingList = NULL;
-     }
-     if (g_scan_refresh_timer) {
-         lv_timer_del(g_scan_refresh_timer);
-         g_scan_refresh_timer = NULL;
-     }
-     // Enforce Radio Silence
-     removeBroadcastPeer();
-     Serial.println("Valid Data Received -> Auto-Stopped Scanning (Radio Silenced).");
-     
-     // UX Requirement: Go to Landing Page immediately on first packet.
-     // This primes the "Auto-Switch to Gauge" logic for the NEXT packet.
-     screen_index = 0; // Landing Page
-     settingsState = false; // Exit settings mode immediately
-     screen_change_requested = true; 
-     // Serial.println("Navigating to Landing Page to prime for Gauge View.");
-     return; // Wait for next packet to auto-switch to Gauge View
-  }
+  // AUTO-SWITCH and AUTO-LOCK Logic:
+  
+  // 1. Scanning Mode Stability Fix:
+  // Previously, we auto-stopped scanning here if *any* ID 11 packet arrived.
+  // This caused the list/QR to disappear if a neighbor's shunt or our own (partially paired) shunt broadcasted.
+  // We now RELY on the user to manually select a device or close the scan.
+  // Exception: If we just successfully paired (via executePairing), that function handles cleanup.
+  
+  // if (g_scanningMode) { ... } // REMOVED
 
   // 2. Auto-Switch Screen
   // Automatically switch to the Gauge View (1) if handling data.
@@ -538,6 +565,15 @@ static void lv_update_shunt_ui_cb(void *user_data)
       screen_change_requested = true;
       bezel_right = true; // Animate forward
       // Serial.println("Auto-Switching to Gauge Screen.");
+  }
+
+  // 3. Pairing Success Feedback (Visual)
+  // If we are in Settings Mode (Pairing) and receive valid data, change "Back" to "Done".
+  // This confirms to the user that the pairing key worked and data is flowing.
+  if (settingsState && ui_landingBackButton) {
+      lv_label_set_text(ui_landingBackButton, "Done");
+      // Optional: Change color to Green?
+      // lv_obj_set_style_text_color(ui_landingBackButton, lv_color_hex(0x00FF00), LV_PART_MAIN);
   }
 
   // Use the same UI updates you used in Task_TFT, running here in LVGL context.
@@ -563,6 +599,9 @@ static void lv_update_shunt_ui_cb(void *user_data)
     "Starter Voltage: %.2f V\n"
     "Error          : %d\n"
     "Run Flat Time  : %s\n"
+    "Last Hour      : %.2f Wh\n"
+    "Last Day       : %.2f Wh\n"
+    "Last Week      : %.2f Wh\n"
     "===================\n",
     p->messageID,
     p->batteryVoltage,
@@ -572,7 +611,10 @@ static void lv_update_shunt_ui_cb(void *user_data)
     p->batteryCapacity,
     p->starterBatteryVoltage,
     p->batteryState,
-    p->runFlatTime
+    p->runFlatTime,
+    p->lastHourWh,
+    p->lastDayWh,
+    p->lastWeekWh
   );
   Serial.print(logBuf);
 
@@ -589,53 +631,67 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   lv_label_set_text_fmt(ui_SOCLabel, "%.0f%%", p->batterySOC * 100.0f);
 
-  // Starter Battery Display Logic
-  // If voltage is NOT 10.00V (allowing for small float error), checks are active.
-  // Cycle: 3s Voltage -> 3s Status -> 56s Run Flat Time.
-  if (fabs(p->starterBatteryVoltage - 10.0f) > 0.05f) {
-      uint32_t cycleTime = millis() % 62000; // 62 second total cycle
-      
-      if (cycleTime < 3000) {
-          // Phase 1: Show Voltage (0-3s)
-          lv_label_set_text_fmt(ui_BatteryTime, "Starter: %.1fV", p->starterBatteryVoltage);
-          lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
-      } else if (cycleTime < 6000) {
-          // Phase 2: Show Status (3-6s)
-          if (p->starterBatteryVoltage > 11.8f) {
-              lv_label_set_text(ui_BatteryTime, "Starter Good!");
-              lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
-          } else {
-              lv_label_set_text(ui_BatteryTime, "Starter Low!");
-              lv_obj_set_style_text_color(ui_BatteryTime, lv_color_hex(0xFFA500), LV_PART_MAIN); // Orange
-          }
-      } else {
-          // Phase 3: Show Run Flat Time (6-62s)
-          lv_label_set_text_fmt(ui_BatteryTime, "%s", p->runFlatTime);
-          lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
-      }
-  } else {
-      // Starter Battery not connected (10.00V default) - Always show Run Flat Time
-      lv_label_set_text_fmt(ui_BatteryTime, "%s", p->runFlatTime);
-      lv_obj_set_style_text_color(ui_BatteryTime, lv_color_white(), LV_PART_MAIN);
+  // Update Cache for Animation Timer
+  g_cachedStarterVoltage = p->starterBatteryVoltage;
+  strncpy(g_cachedRunFlatTime, p->runFlatTime, sizeof(g_cachedRunFlatTime) - 1);
+  g_cachedRunFlatTime[sizeof(g_cachedRunFlatTime) - 1] = '\0';
+
+  // Ensure timer is running (lazy init if not done in setup)
+  if (!g_starterAnimationTimer) {
+     g_starterAnimationTimer = lv_timer_create(update_battery_label_timer_cb, 250, NULL); // 4Hz update is enough for text
   }
 
   // Energy Bars Update
+  
+  // 1. Estimate Battery Total Capacity (Wh) to define scale.
+  // MaxAh = RemainingAh / SOC
+  float maxAh = 100.0f; // Default
+  if (p->batterySOC > 0.01f) {
+      maxAh = p->batteryCapacity / p->batterySOC;
+  }
+  float maxWh_Daily = maxAh * 12.0f; // Nominal 12V
+  float maxWh_Weekly = maxWh_Daily * 7.0f;
+
+  // 2. Scale Values to +/- 100 range
+  // Daily
+  int32_t barDayVal = 0;
+  if (maxWh_Daily > 0) barDayVal = (int32_t)((p->lastDayWh / maxWh_Daily) * 100.0f);
+  if (barDayVal > 100) barDayVal = 100;
+  if (barDayVal < -100) barDayVal = -100;
+
   // Weekly
-  if (ui_BarWeek) {
-      lv_bar_set_value(ui_BarWeek, (int32_t)p->lastWeekWh, LV_ANIM_ON);
-      if (ui_BarWeekLabel) {
-          lv_label_set_text_fmt(ui_BarWeekLabel, "%.0f>", p->lastWeekWh);
-          lv_obj_set_y(ui_BarWeekLabel, get_bar_label_y(p->lastWeekWh));
+  int32_t barWeekVal = 0;
+  if (maxWh_Weekly > 0) barWeekVal = (int32_t)((p->lastWeekWh / maxWh_Weekly) * 100.0f);
+  if (barWeekVal > 100) barWeekVal = 100;
+  if (barWeekVal < -100) barWeekVal = -100;
+
+  // 3. Update UI
+  // Energy Value Labels Update (Replaces Bars)
+  // Format: "1.2k" or "99W"
+  
+  // Weekly
+  if (ui_BarWeekLabel) {
+      char buf[16];
+      // Inline formatting logic since helper was removed
+      float abs_wh = fabs(p->lastWeekWh);
+      if (abs_wh > 99.0f) {
+           snprintf(buf, sizeof(buf), "%.1f", abs_wh / 1000.0f);
+      } else {
+           snprintf(buf, sizeof(buf), "%.0f", abs_wh);
       }
+      lv_label_set_text(ui_BarWeekLabel, buf);
   }
 
   // Daily
-  if (ui_BarDay) {
-      lv_bar_set_value(ui_BarDay, (int32_t)p->lastDayWh, LV_ANIM_ON);
-      if (ui_BarDayLabel) {
-          lv_label_set_text_fmt(ui_BarDayLabel, "<%.0f", p->lastDayWh);
-          lv_obj_set_y(ui_BarDayLabel, get_bar_label_y(p->lastDayWh));
+  if (ui_BarDayLabel) {
+      char buf[16];
+      float abs_wh = fabs(p->lastDayWh);
+       if (abs_wh > 99.0f) {
+           snprintf(buf, sizeof(buf), "%.1f", abs_wh / 1000.0f);
+      } else {
+           snprintf(buf, sizeof(buf), "%.0f", abs_wh);
       }
+      lv_label_set_text(ui_BarDayLabel, buf);
   }
 
   enable_ui_batteryScreen = true;
@@ -664,6 +720,9 @@ static void lv_update_shunt_ui_cb(void *user_data)
   if (p->batterySOC >= 0.0f && p->batterySOC < BATTERY_SOC_ALERT) battery_issue = true;
   if (fabsf(p->batteryCurrent) > BATTERY_CURRENT_ALERT_A) battery_issue = true;
   if (p->batteryVoltage < BATTERY_VOLTAGE_LOW || p->batteryVoltage > BATTERY_VOLTAGE_HIGH) battery_issue = true;
+  
+  // New Error States (Load Off, E-Fuse, Over Current)
+  if (p->batteryState != 0) battery_issue = true;
 
   if (battery_issue)
   {
@@ -697,6 +756,15 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
   {
     // Serial.println("Received AE-Smart-Shunt data (ID 11)");
     
+    // Debug: Log Incoming MAC
+    char macStr[18];
+    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    
+    if (g_scanningMode) {
+        Serial.printf("SCAN: Recv ID 11 from %s\n", macStr);
+    }
+    
     struct_message_ae_smart_shunt_1 incomingReadings;
     
     memcpy(&incomingReadings, incomingData, sizeof(incomingReadings));
@@ -721,10 +789,10 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // else: accept all (Discovery Mode / Legacy)
 
     // Update connected devices map
-    char macStr[18];
-    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
+    if (g_scanningMode) {
+       Serial.printf("SCAN: Added/Updated Device List -> %s\n", macStr);
+    }
 
     // Defensive copy: zero target and copy up to struct size
     struct_message_ae_smart_shunt_1 tmp;
@@ -781,8 +849,7 @@ void flashErase()
 {
   nvs_flash_erase(); // erase the NVS partition and...
   nvs_flash_init();  // initialize the NVS partition.
-  while (true)
-    ;
+  // while (true) ; // REMOVED: Blocking loop prevented ESP.restart()
 }
 
 void pin_init()
@@ -1102,6 +1169,17 @@ void Task_main(void *pvParameters)
       timerRunning = false; // Reset timer if you want to run again
     }
 
+    static bool resetPending = false;
+    static unsigned long resetPendingTime = 0;
+
+    // Timeout for reset pending (5 seconds)
+    if (resetPending && (millis() - resetPendingTime > 5000)) {
+        resetPending = false;
+        Serial.println("Factory Reset Timeout");
+        lv_label_set_text(ui_feedbackLabel, ""); // Clear warning
+         if (ui_feedbackLabel) lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+    }
+
     InputActions action = e.read();
     switch (action)
     {
@@ -1109,12 +1187,31 @@ void Task_main(void *pvParameters)
       break;
 
     case SINGLE_PRESS:
-      Serial.println("Single Pressed");
-      toggleBacklightDim();
+      if (resetPending) {
+          Serial.println("FACTORY RESET CONFIRMED!");
+          if (ui_feedbackLabel) {
+              lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+              lv_label_set_text(ui_feedbackLabel, "RESETTING DEVICE...");
+              lv_refr_now(NULL);
+          }
+           delay(1000); // Give time to see message
+           flashErase(); // NVS Erase
+           ESP.restart();
+      } else {
+          Serial.println("Single Pressed");
+          toggleBacklightDim();
+      }
       break;
 
     case LONG_PRESS:
-      Serial.println("Long Pressed");
+      Serial.println("Long Pressed - Reset Request");
+      resetPending = true;
+      resetPendingTime = millis();
+       if (ui_feedbackLabel) {
+          lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+          lv_label_set_text(ui_feedbackLabel, "PRESS AGAIN TO RESET");
+          lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_hex(0xFF0000), LV_PART_MAIN); // Red Warning
+      }
       break;
 
     case ENC_CW:
@@ -1322,11 +1419,4 @@ void loop()
   // not really needed.
 }
 
-extern "C" void AE_StartPairing() {
-    // Force LVGL to update the screen (hiding icons) BEFORE we draw on top of it.
-    lv_refr_now(NULL);
-
-    pairingHandler.generateNewKey();
-    String payload = pairingHandler.getPairingString(WiFi.macAddress(), "FF:FF:FF:FF:FF:FF");
-    pairingHandler.drawQRCode(gfx, 110, 110, 260, payload);
-}
+// AE_StartPairing removed. Replaced by startPairingProcess -> executePairing.

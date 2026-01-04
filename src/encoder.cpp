@@ -46,7 +46,7 @@ InputActions Encoder::readSwitch() {
       timeCapture = 0;
   }
 
-  if (timeCapture && (millis() - timeCapture) > 450) {
+  if (timeCapture && (millis() - timeCapture) > longPressLength) {
     timeCapture = 0;
     return LONG_PRESS;
   }
