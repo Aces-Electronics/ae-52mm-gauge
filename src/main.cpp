@@ -135,6 +135,22 @@ struct DeviceInfo {
 };
 std::map<String, DeviceInfo> connectedDevices;
 
+// Cached data for Swing Arc
+float g_lastTemp = -999.0f; // invalid init
+bool enable_ui_temperatureScreen = true; // Enable by default for now
+struct_message_ae_temp_sensor g_lastTempData; // Cache for UI refresh
+bool g_hasTempData = false;
+
+// Remember Screen Logic
+bool g_rememberScreen = false;
+unsigned long g_lastScreenSwitchTime = 0;
+const unsigned long AUTO_SWITCH_DWELL_MS = 5000;
+
+// Factory Reset Logic
+bool g_resetPending = false;
+unsigned long g_resetPendingTime = 0;
+
+
 // Helper to parse MAC string to bytes
 void parseBytes(const char* str, char sep, byte* bytes, int maxBytes, int base) {
     for (int i = 0; i < maxBytes; i++) {
@@ -183,13 +199,13 @@ void hexStringToBytes(String hex, uint8_t* bytes, int len) {
 
 // Queue for QR Code drawing
 bool g_showQR = false;
-String g_qrPayload = "";
+char g_qrPayload[512] = "";
 
 // Helper to generate QR logic (Moved from startPairingProcess)
-void executePairing(String targetMacStr) {
+void executePairing(String targetMacStr, String deviceType) {
     if (targetMacStr == "") return;
     
-    Serial.printf("Executing Pairing for: %s\n", targetMacStr.c_str());
+    Serial.printf("Executing Pairing for: %s (Type: %s)\n", targetMacStr.c_str(), deviceType.c_str());
 
      // 1. Generate Key
     pairingHandler.generateNewKey();
@@ -227,21 +243,45 @@ void executePairing(String targetMacStr) {
     // NVS Key max 15 chars. MAC is 17. Strip colons -> 12 chars.
     String macKey = targetMacStr;
     macKey.replace(":", ""); 
+    
+    // Save Key under MAC-derived key (Generic look-up)
     preferences.putString(macKey.c_str(), keyHex);
-    // STORE THE CURRENT PAIRED DEVICE as "p_paired_mac"
-    preferences.putString("p_paired_mac", targetMacStr); 
+    
+    // STORE THE SPECIFIC PAIRED DEVICE
+    if (deviceType.indexOf("Temp") >= 0) {
+         preferences.putString("p_temp_mac", targetMacStr); 
+         // Global State update?
+    } else {
+         // Default to Shunt
+         preferences.putString("p_paired_mac", targetMacStr); 
+         memcpy(g_pairedMac, macBytes, 6);
+    }
+    
+    // Key length max 15 chars! "p_paired_mac_last" is 17 chars -> INVALID
+    preferences.putString("p_last_mac", targetMacStr); // Shortened key
+    
     preferences.end();
     
-    // Update global state
-    memcpy(g_pairedMac, macBytes, 6);
-    g_isPaired = true;
+    g_isPaired = true; // Use simple flag for "Paired Mode" (Silent)
 
     // 4. Generate QR Payload
-    String gaugeMac = WiFi.macAddress();
-    String payload = pairingHandler.getPairingString(gaugeMac, targetMacStr);
-    
-    Serial.printf("QR GENERATED:\n  Target Shunt MAC: %s\n  Gauge MAC: %s\n  Payload: %s\n", 
-                  targetMacStr.c_str(), gaugeMac.c_str(), payload.c_str());
+    // Include type in payload? App expects JSON valid for that device.
+    // Shunt: {"gauge_mac":"...", "key":"..."}
+    // Temp:  {"gauge_mac":"...", "key":"..."} (Same format)
+    String myMac = WiFi.macAddress();
+    // Generate QR Payload
+    // Format: {"gauge_mac":"<MAC>","key":"<KEY>"}
+    // Note: User reported corruption "gaug1:61:46:7C".
+    // 1. Ensure buffer size is adequate. 512 is plenty.
+    // 2. Ensure format string is correct.
+    snprintf(g_qrPayload, sizeof(g_qrPayload), 
+             "{\"gauge_mac\":\"%s\",\"key\":\"%s\"}", 
+             myMac.c_str(), keyHex.c_str());
+             
+    Serial.println("QR GENERATED:");
+    Serial.printf("  Target: %s\n", targetMacStr.c_str());
+    Serial.printf("  Gauge: %s\n", myMac.c_str());
+    Serial.printf("  Payload: %s\n", g_qrPayload);
     
     // 5. Hide UI Elements (including local list if any)
     if (ui_feedbackLabel) lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
@@ -252,7 +292,7 @@ void executePairing(String targetMacStr) {
     if (ui_aeLandingBottomIcon) lv_obj_add_flag(ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN);
     
     // Set flag and payload for Task_TFT to handle
-    g_qrPayload = payload;
+    // g_qrPayload is already populated via snprintf above.
     g_showQR = true;
     Serial.println("Pairing Process Initiated. Waiting for render task...");
 }
@@ -284,6 +324,9 @@ static void pairing_list_event_handler(lv_event_t * e)
             int end = label.lastIndexOf(')');
             if (start > 0 && end > start) {
                 String mac = label.substring(start + 1, end);
+                String type = label.substring(0, start); // "Type " (with trailing space?)
+                type.trim();
+                
                 // Hide/Delete List and Stop Scanning
                 if (g_pairingList) {
                     lv_obj_del(g_pairingList);
@@ -294,7 +337,7 @@ static void pairing_list_event_handler(lv_event_t * e)
                     lv_timer_del(g_scan_refresh_timer);
                     g_scan_refresh_timer = NULL;
                 }
-                executePairing(mac);
+                executePairing(mac, type);
                 
                 // Now that we are paired, remove the broadcast listener
                 if (g_isPaired) {
@@ -383,7 +426,8 @@ extern "C" void startPairingProcess() {
 
 // Mesh indicator / heartbeat UI helpers
 static lv_timer_t *g_mesh_timer = NULL;
-static uint32_t g_mesh_expire_ms = 0; // millis when mesh blinking should stop
+static uint32_t g_shunt_expire_ms = 0; // millis when shunt mesh blinking should stop
+static uint32_t g_temp_expire_ms = 0;  // millis when temp mesh blinking should stop
 static const uint32_t MESH_DURATION_MS = 20000; // 16 seconds
 static const uint32_t MESH_TOGGLE_MS = 500;     // toggle every 500ms -> 1Hz blink
 
@@ -407,28 +451,48 @@ static void set_battery_elements_color(lv_color_t color)
 static void mesh_timer_cb(lv_timer_t *timer)
 {
   (void)timer;
-  // If expired, hide the indicator and stop timer
-  if (millis() > g_mesh_expire_ms)
-  {
-    if (ui_meshIndicator)
-      lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+  uint32_t now = millis();
+  bool shunt_active = (now <= g_shunt_expire_ms);
+  bool temp_active = (now <= g_temp_expire_ms);
 
-    if (g_mesh_timer)
-    {
-      lv_timer_del(g_mesh_timer);
-      g_mesh_timer = NULL;
-    }
-    return;
+  // If BOTH expired, stop timer
+  if (!shunt_active && !temp_active)
+  {
+      if (ui_meshIndicator) lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+      if (ui_TempmeshIndicator) lv_obj_add_flag(ui_TempmeshIndicator, LV_OBJ_FLAG_HIDDEN);
+
+      if (g_mesh_timer) {
+          lv_timer_del(g_mesh_timer);
+          g_mesh_timer = NULL;
+      }
+      return;
   }
 
-  // Toggle visibility
-  if (!ui_meshIndicator)
-    return;
+  // Handle Shunt Indicator
+  if (ui_meshIndicator) {
+      if (!shunt_active) {
+          lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+      } else {
+          // Toggle
+          if (lv_obj_has_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN))
+             lv_obj_clear_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+          else
+             lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+      }
+  }
 
-  if (lv_obj_has_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN))
-    lv_obj_clear_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
-  else
-    lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
+  // Handle Temp Indicator
+  if (ui_TempmeshIndicator) {
+      if (!temp_active) {
+          lv_obj_add_flag(ui_TempmeshIndicator, LV_OBJ_FLAG_HIDDEN);
+      } else {
+          // Toggle
+          if (lv_obj_has_flag(ui_TempmeshIndicator, LV_OBJ_FLAG_HIDDEN))
+             lv_obj_clear_flag(ui_TempmeshIndicator, LV_OBJ_FLAG_HIDDEN);
+          else
+             lv_obj_add_flag(ui_TempmeshIndicator, LV_OBJ_FLAG_HIDDEN);
+      }
+  }
 }
 
 // Heartbeat timer callback: steps through red/white flashes then stops
@@ -463,6 +527,46 @@ static void heartbeat_timer_cb(lv_timer_t *timer)
   }
 
   g_heartbeat_step++;
+}
+
+
+extern "C" void toggleRememberScreen() {
+    g_rememberScreen = !g_rememberScreen;
+    
+    // Visual Feedback
+    if (g_rememberScreen) {
+        if (ui_aeLandingIcon) {
+            lv_obj_set_style_img_recolor_opa(ui_aeLandingIcon, LV_OPA_50, LV_PART_MAIN);
+            lv_obj_set_style_img_recolor(ui_aeLandingIcon, lv_color_hex(0x00FF00), LV_PART_MAIN); // Green tint
+        }
+        if (ui_feedbackLabel) {
+            lv_label_set_text(ui_feedbackLabel, "AUTO-SWITCH: OFF");
+            lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_hex(0xFFA500), LV_PART_MAIN); // Orange
+        }
+    } else {
+        if (ui_aeLandingIcon) {
+            lv_obj_set_style_img_recolor_opa(ui_aeLandingIcon, LV_OPA_TRANSP, LV_PART_MAIN);
+        }
+        if (ui_feedbackLabel) {
+            lv_label_set_text(ui_feedbackLabel, "AUTO-SWITCH: ON");
+            lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_white(), LV_PART_MAIN);
+        }
+    }
+    
+    // Show feedback label temporarily
+    if (ui_feedbackLabel) {
+        lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+    }
+    
+    // Save to NVS
+    preferences.begin("ae", false);
+    preferences.putBool("rem_scr", g_rememberScreen); // "rem_scr" key, not "remember_scr" (keep short)
+    if (g_rememberScreen) {
+        preferences.putInt("last_scr", screen_index);
+    }
+    preferences.end();
+    
+    Serial.printf("Remember Screen toggled: %s\n", g_rememberScreen ? "ON" : "OFF");
 }
 
 
@@ -558,13 +662,15 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   // 2. Auto-Switch Screen
   // Automatically switch to the Gauge View (1) if handling data.
-  // BUT: Do not switch if we are in Settings Mode (prevent interference).
-  // AND: Do not switch if we are ALREADY on the Gauge Screen (1).
-  if (screen_index != 1 && !settingsState) {
+  // Respect "Remember Screen" (Lock) and Dwell Time.
+  bool allowSwitch = !settingsState && !g_rememberScreen;
+  bool dwellPassed = (millis() - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS);
+
+  if (allowSwitch && dwellPassed && screen_index != 1) {
       screen_index = 1;
       screen_change_requested = true;
       bezel_right = true; // Animate forward
-      // Serial.println("Auto-Switching to Gauge Screen.");
+      g_lastScreenSwitchTime = millis(); // Reset dwell timer
   }
 
   // 3. Pairing Success Feedback (Visual)
@@ -580,16 +686,18 @@ static void lv_update_shunt_ui_cb(void *user_data)
   // Check if we should update the landing label (only if not scrolling through devices)
   if (screen_index > 0) {
       lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-      lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE-Shunt: %.2fV  %.2fA  %.2fW",
+      lv_label_set_text_fmt(ui_aeLandingBottomLabel, "%s: %.2fV  %.2fA  %.2fW",
+                            p->name[0] ? p->name : "AE Smart Shunt",
                             p->batteryVoltage,
                             p->batteryCurrent,
                             p->batteryPower);
   }
 
   // Atomic Logging to prevent interleaving
-  char logBuf[512];
+  char logBuf[1024]; // Increased buffer size
   snprintf(logBuf, sizeof(logBuf), 
     "\n=== Local Shunt ===\n"
+    "Name           : %s\n"
     "Message ID     : %d\n"
     "Voltage        : %.2f V\n"
     "Current        : %.2f A\n"
@@ -603,6 +711,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
     "Last Day       : %.2f Wh\n"
     "Last Week      : %.2f Wh\n"
     "===================\n",
+    p->name[0] ? p->name : "AE Smart Shunt",
     p->messageID,
     p->batteryVoltage,
     p->batteryCurrent,
@@ -617,8 +726,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
     p->lastWeekWh
   );
   Serial.print(logBuf);
-
-  Serial.print(logBuf);
+  // Duplicate print removed
 
   // Change: Outer Arc now displays SOC (0-100%) instead of Voltage
   lv_arc_set_range(ui_SBattVArc, 0, 100);
@@ -698,7 +806,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
   // Redundant logic removed. Auto-switch handled at top of function.
 
   // --- Start/refresh mesh indicator blinking for MESH_DURATION_MS ---
-  g_mesh_expire_ms = millis() + MESH_DURATION_MS;
+  g_shunt_expire_ms = millis() + MESH_DURATION_MS;
   if (ui_meshIndicator)
   {
     // ensure visible so the timer toggles it
@@ -739,6 +847,74 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   // Free the heap memory we allocated in the ESP-NOW callback
   free(p);
+}
+
+static void lv_update_temp_ui_cb(void *user_data)
+{
+    struct_message_ae_temp_sensor *p = (struct_message_ae_temp_sensor *)user_data;
+    if (!p) return;
+
+    // Auto-Switch Logic
+    bool allowSwitch = !settingsState && !g_rememberScreen;
+    bool dwellPassed = (millis() - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS);
+
+    if (allowSwitch && dwellPassed && screen_index != 2) {
+        screen_index = 2; // Temp Screen Index
+        screen_change_requested = true;
+        bezel_right = true;
+        g_lastScreenSwitchTime = millis();
+    }
+
+    // Pairing Success Feedback (Visual)
+    // If we are in Settings Mode (Pairing) and receive valid data, change "Back" to "Done".
+    // This confirms to the user that the pairing key worked and data is flowing.
+    if (settingsState && ui_landingBackButton) {
+        lv_label_set_text(ui_landingBackButton, "Done");
+    }
+
+    // Update Temperature Arc & Label
+    lv_arc_set_value(ui_TempTempArc, (int)p->temperature);
+    lv_label_set_text_fmt(ui_TempTempLabel, "%.1f C", p->temperature);
+
+    // Update Swing Arc
+    if (g_lastTemp > -900.0f) {
+        float diff = p->temperature - g_lastTemp;
+        // Clamp diff? Arc range -5 to 5
+        lv_arc_set_value(ui_TempSwingArc, (int)diff);
+    }
+    g_lastTemp = p->temperature;
+
+    // Update Name
+    lv_label_set_text(ui_TempNameLabel, p->name);
+
+    // Update Battery (Only show if <= 15%)
+    if (p->batteryLevel <= 15) {
+        lv_obj_clear_flag(ui_TempBattSOCLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text_fmt(ui_TempBattSOCLabel, "Sensor Battery: %d%%", p->batteryLevel);
+        lv_obj_set_style_text_color(ui_TempBattSOCLabel, lv_color_hex(0xFFA500), LV_PART_MAIN); // Orange warning
+    } else {
+        lv_obj_add_flag(ui_TempBattSOCLabel, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // Mesh Indicator (Blinking)
+    // Use reported interval + 20% buffer (min 2s buffer)
+    uint32_t buffer = p->updateInterval / 5;
+    if (buffer < 2000) buffer = 2000;
+    g_temp_expire_ms = millis() + p->updateInterval + buffer;
+    
+    // Debug
+    // Serial.printf("Next Packet Expire: %d ms (Interval %d)\n", g_temp_expire_ms - millis(), p->updateInterval);
+
+    if (ui_TempmeshIndicator) {
+         lv_obj_clear_flag(ui_TempmeshIndicator, LV_OBJ_FLAG_HIDDEN);
+         if (!g_mesh_timer) {
+             g_mesh_timer = lv_timer_create(mesh_timer_cb, MESH_TOGGLE_MS, NULL);
+         } else {
+             lv_timer_set_period(g_mesh_timer, MESH_TOGGLE_MS);
+         }
+    }
+
+    free(p);
 }
 
 // Callback when data is received
@@ -842,6 +1018,55 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
        // Serial.println("Received Beacon (ID 33) - List Updated");
       break;
   }
+  
+  case 22: // Temp Sensor
+  {
+      struct_message_ae_temp_sensor tmp;
+      if (len != sizeof(tmp)) {
+          Serial.printf("Error: Size mismatch! Expected %d, got %d\n", sizeof(tmp), len);
+          return;
+      }
+      memcpy(&tmp, incomingData, sizeof(tmp));
+      
+      // Atomic print to prevent garbling
+      char bigBuff[256];
+      snprintf(bigBuff, sizeof(bigBuff), 
+        "\n=== Temp Sensor Pkt ===\n"
+        "Temp: %.2f C, Batt: %d %%, Interval: %lu ms\n"
+        "=======================\n\n",
+        (double)tmp.temperature, (int)tmp.batteryLevel, (unsigned long)tmp.updateInterval);
+      
+      Serial.print(bigBuff);
+      
+      // DISCOVERY LOGIC ADDED:
+      // Update connected devices map so it shows on Landing Page
+      char macStr[18];
+      snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+               mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+               
+      // Use the name sent by the sensor (which is now just the suffix "Right Fridge" or "AE Temp Sensor")
+      // Ensure null termination just in case
+      tmp.name[sizeof(tmp.name)-1] = '\0';
+      String displayName = String(tmp.name);
+      if (displayName.length() == 0) displayName = "Temp Sensor";
+      
+      connectedDevices[String(macStr)] = {displayName, millis()};
+      
+      if (g_scanningMode) {
+         Serial.printf("SCAN: Added/Updated Temp Sensor -> %s (%s)\n", macStr, displayName.c_str());
+       }
+            memcpy(&g_lastTempData, &tmp, sizeof(tmp));
+        g_hasTempData = true;
+        
+        // Allocate heap memory for LVGL async call
+        struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
+        if (tData)
+        {
+          memcpy(tData, &tmp, sizeof(struct_message_ae_temp_sensor));
+          lv_async_call(lv_update_temp_ui_cb, tData);
+        }
+      break;
+  }
   }
 }
 
@@ -890,6 +1115,19 @@ void changeScreen(lv_obj_t *targetScreen, bool enabled, const char *screenName)
   }
 
   // Serial.printf("Displaying: %s\n", screenName);
+}
+
+void executeFactoryReset(void * data) {
+      delay(1000); // Give time to see message (blocks GUI thread, which is fine)
+      flashErase(); 
+      ESP.restart();
+}
+
+void clearResetWarning(void * data) {
+    if (ui_feedbackLabel) {
+       lv_label_set_text(ui_feedbackLabel, "");
+       lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 /* Display flushing */
@@ -978,6 +1216,7 @@ static void updateTopStatus(String text)
 
 void updateWiFiState()
 {
+  if (g_resetPending) return; // Don't overwrite Reset Prompt
   int connectionStatus = WiFi.status();
   if (!settingsState)
   {
@@ -1099,8 +1338,9 @@ void Task_TFT(void *pvParameters)
       // Example logic for screen_index based on screen_index
       // Logic for screen_index clamping and Landing Page scrolling
       int min_index = -(int)connectedDevices.size();
-      if (screen_index > 1)
-        screen_index = 1;
+      // Update max index to 2 (Temp Screen)
+      if (screen_index > 2)
+        screen_index = 2;
       else if (screen_index < min_index)
         screen_index = min_index;
       
@@ -1108,23 +1348,10 @@ void Task_TFT(void *pvParameters)
       // REMOVED: Auto-Scan on landing page. Now controlled explicitly by 'startPairingProcess'.
       // g_scanningMode = (screen_index <= 0);
       
-      // Update label if on Landing Page (<= 0)
-      if (screen_index <= 0) {
+      // Update label if on Landing Page (0)
+      if (screen_index == 0) {
           lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-          if (screen_index == 0) {
-               lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE Network: %d Device(s) Found", connectedDevices.size());
-          } else {
-               // Negative index: show specific device
-               int target = -screen_index - 1; // 0-based index for map
-               int current = 0;
-               for (std::map<String, DeviceInfo>::iterator it = connectedDevices.begin(); it != connectedDevices.end(); ++it) {
-                   if (current == target) {
-                       lv_label_set_text_fmt(ui_aeLandingBottomLabel, "Device: %s", it->second.type.c_str());
-                       break;
-                   }
-                   current++;
-               }
-          }
+          lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE Network: %d Device(s) Found", connectedDevices.size());
       }
 
       // Serial.printf("Screen change case: %d\n", screen_index);
@@ -1134,7 +1361,14 @@ void Task_TFT(void *pvParameters)
       case 0:
       default: // Handle negative indices as Landing Page
         if (screen_index <= 0) {
-            changeScreen(ui_bootInitialScreen, enable_ui_bootInitialScreen, "Boot Initial Screen");
+             _ui_screen_change( &ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_bootInitialScreen_screen_init);
+             
+             // If Reset is Pending, Show Warning immediately after loading screen
+             if (g_resetPending) {
+                 lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+                 lv_label_set_text(ui_feedbackLabel, "PRESS AGAIN TO RESET");
+                 lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_hex(0xFF0000), LV_PART_MAIN);
+             }
         } else {
              // Fallback
             changeScreen(ui_bootInitialScreen, enable_ui_bootInitialScreen, "Boot Initial Screen");
@@ -1142,6 +1376,17 @@ void Task_TFT(void *pvParameters)
         break;
       case 1:
         changeScreen(ui_batteryScreen, enable_ui_batteryScreen, "Battery Screen");
+        break;
+      case 2:
+        changeScreen(ui_temperatureScreen, enable_ui_temperatureScreen, "Temperature Screen");
+        // Force Update if data exists
+        if (g_hasTempData) {
+             struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
+             if (tData) {
+                 memcpy(tData, &g_lastTempData, sizeof(struct_message_ae_temp_sensor));
+                 lv_async_call(lv_update_temp_ui_cb, tData);
+             }
+        }
         break;
 
       }
@@ -1169,15 +1414,11 @@ void Task_main(void *pvParameters)
       timerRunning = false; // Reset timer if you want to run again
     }
 
-    static bool resetPending = false;
-    static unsigned long resetPendingTime = 0;
-
     // Timeout for reset pending (5 seconds)
-    if (resetPending && (millis() - resetPendingTime > 5000)) {
-        resetPending = false;
+    if (g_resetPending && (millis() - g_resetPendingTime > 5000)) {
+        g_resetPending = false;
         Serial.println("Factory Reset Timeout");
-        lv_label_set_text(ui_feedbackLabel, ""); // Clear warning
-         if (ui_feedbackLabel) lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_async_call(clearResetWarning, NULL);
     }
 
     InputActions action = e.read();
@@ -1187,16 +1428,10 @@ void Task_main(void *pvParameters)
       break;
 
     case SINGLE_PRESS:
-      if (resetPending) {
+      if (g_resetPending) {
           Serial.println("FACTORY RESET CONFIRMED!");
-          if (ui_feedbackLabel) {
-              lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
-              lv_label_set_text(ui_feedbackLabel, "RESETTING DEVICE...");
-              lv_refr_now(NULL);
-          }
-           delay(1000); // Give time to see message
-           flashErase(); // NVS Erase
-           ESP.restart();
+          // Offload to LVGL thread to avoid crash
+          lv_async_call(executeFactoryReset, NULL);
       } else {
           Serial.println("Single Pressed");
           toggleBacklightDim();
@@ -1205,22 +1440,39 @@ void Task_main(void *pvParameters)
 
     case LONG_PRESS:
       Serial.println("Long Pressed - Reset Request");
-      resetPending = true;
-      resetPendingTime = millis();
-       if (ui_feedbackLabel) {
-          lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
-          lv_label_set_text(ui_feedbackLabel, "PRESS AGAIN TO RESET");
-          lv_obj_set_style_text_color(ui_feedbackLabel, lv_color_hex(0xFF0000), LV_PART_MAIN); // Red Warning
-      }
+      g_resetPending = true;
+      g_resetPendingTime = millis();
+      // Switch to Landing Page to show warning
+      screen_index = 0;
+      screen_change_requested = true;
       break;
 
     case ENC_CW:
     case ENC_CCW:
-      screen_index += (action == ENC_CW) ? 1 : -1;
-      Serial.printf("Encoder %s %d\n", (action == ENC_CW) ? "Clockwise" : "CounterClockwise", screen_index);
+      // screen_index += (action == ENC_CW) ? 1 : -1;
+      // Looping Logic:
+      int dir = (action == ENC_CW) ? 1 : -1;
+      int next_index = screen_index + dir;
+      // int min_idx = -(int)connectedDevices.size(); // REMOVED: User wants standard cycling only
+      int min_idx = 0; 
+      int max_idx = 2; // Temp Screen
+
+      if (next_index > max_idx) screen_index = min_idx;       // Wrap to Min
+      else if (next_index < min_idx) screen_index = max_idx;  // Wrap to Max
+      else screen_index = next_index;
+
+      Serial.printf("Encoder %s %d\n", (action == ENC_CW) ? "CW" : "CCW", screen_index);
       bezel_right = (action == ENC_CW);
       bezel_left = (action == ENC_CCW);
       screen_change_requested = true;
+      g_lastScreenSwitchTime = millis(); // Manual interaction resets auto-switch timer
+      
+      // Update NVS if Remember Screen is active
+      if (g_rememberScreen && !settingsState) {
+           preferences.begin("ae", false);
+           preferences.putInt("last_scr", screen_index);
+           preferences.end();
+      }
       break;
     }
 
@@ -1301,6 +1553,15 @@ void setup()
   wifiSetToOn = preferences.getBool("p_wifiOn");
   SSID = preferences.getString("p_ssid", "no_p_ssid");
   PWD = preferences.getString("p_pwd", "no_p_pwd");
+
+  // Load Remember Screen
+  g_rememberScreen = preferences.getBool("remember_scr", false);
+  if (g_rememberScreen) {
+      screen_index = preferences.getInt("last_scr", 1); // Default to Gauge (1) if enabled but invalid
+      screen_change_requested = true;
+      Serial.printf("Restoring Last Screen: %d\n", screen_index);
+  }
+
   preferences.end();
 
   update_c_strings();
@@ -1325,41 +1586,51 @@ void setup()
 
   // 1. Load Paired Device Info FIRST
   preferences.begin("peers", true);
-  String pairedMacStr = preferences.getString("p_paired_mac", "");
+  String pairedMacStr = preferences.getString("p_paired_mac", ""); // Shunt
+  String tempMacStr = preferences.getString("p_temp_mac", "");     // Temp Sensor
   preferences.end();
   
-  if (pairedMacStr != "") {
-      Serial.printf("Loading Paired Device: %s\n", pairedMacStr.c_str());
-      parseBytes(pairedMacStr.c_str(), ':', g_pairedMac, 6, 16);
-      g_isPaired = true;
-      
-      // Also need to restore Encrypted Peer? 
-      // The pairing key is stored under macKey (stripped colons).
-      String macKey = pairedMacStr;
-      macKey.replace(":", "");
-      
-      preferences.begin("peers", true);
-      String keyHex = preferences.getString(macKey.c_str(), "");
-      preferences.end();
-      
-      if (keyHex.length() == 32) {
-          uint8_t keyBytes[16];
-          hexStringToBytes(keyHex, keyBytes, 16); // Assuming this helper exists or we duplicate it
+  // Helper Helper
+  auto loadPeer = [&](String macStr, String label) {
+       if (macStr != "") {
+          Serial.printf("Loading %s: %s\n", label.c_str(), macStr.c_str());
           
-          esp_now_peer_info_t securePeer;
-          memset(&securePeer, 0, sizeof(securePeer));
-          memcpy(securePeer.peer_addr, g_pairedMac, 6);
-          securePeer.channel = 0;
-          securePeer.encrypt = true;
-          memcpy(securePeer.lmk, keyBytes, 16);
+          uint8_t mBytes[6];
+          parseBytes(macStr.c_str(), ':', mBytes, 6, 16);
+          if (label.equals("Shunt")) memcpy(g_pairedMac, mBytes, 6); // Preserve Shunt as primary for now
+
+          String macKey = macStr;
+          macKey.replace(":", "");
           
-          if (esp_now_add_peer(&securePeer) == ESP_OK) {
-              Serial.println("Restored Secure Peer connection.");
+          preferences.begin("peers", true);
+          String keyHex = preferences.getString(macKey.c_str(), "");
+          preferences.end();
+          
+          if (keyHex.length() == 32) {
+              uint8_t keyBytes[16];
+              hexStringToBytes(keyHex, keyBytes, 16);
+              
+              esp_now_peer_info_t securePeer;
+              memset(&securePeer, 0, sizeof(securePeer));
+              memcpy(securePeer.peer_addr, mBytes, 6);
+              securePeer.channel = 0;
+              securePeer.encrypt = true;
+              memcpy(securePeer.lmk, keyBytes, 16);
+              
+              if (esp_now_add_peer(&securePeer) == ESP_OK) {
+                  Serial.printf("BOOT: Restored %s Peer [MAC: %s]\n", label.c_str(), macStr.c_str());
+                  g_isPaired = true;
+              } else {
+                  Serial.printf("BOOT: Failed to restore %s Peer [MAC: %s]\n", label.c_str(), macStr.c_str());
+              }
           } else {
-              Serial.println("Failed to restore Secure Peer.");
+              Serial.printf("BOOT: Key Missing for %s [MAC: %s]\n", label.c_str(), macStr.c_str());
           }
-      }
-  }
+       }
+  };
+
+  loadPeer(pairedMacStr, "Shunt");
+  loadPeer(tempMacStr, "Temp");
 
   // 2. Add peer (broadcast) ONLY if not paired.
   // If paired, we stay silent until user triggers scan.

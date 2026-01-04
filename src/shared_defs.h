@@ -70,6 +70,16 @@ typedef struct struct_message_ae_smart_shunt_1 {
   float lastHourWh;
   float lastDayWh;
   float lastWeekWh;
+  char name[24];   // Device name (e.g., "AE Smart Shunt" or custom)
 } __attribute__((packed)) struct_message_ae_smart_shunt_1;
+
+typedef struct struct_message_ae_temp_sensor {
+  uint8_t id;
+  float temperature;
+  float batteryVoltage;
+  uint8_t batteryLevel;
+  uint32_t updateInterval;
+  char name[16];
+} __attribute__((packed)) struct_message_ae_temp_sensor;
 
 #endif // SHARED_DEFS_H

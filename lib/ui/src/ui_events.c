@@ -161,7 +161,12 @@ void landingBackButtonPressedFunction(lv_event_t *e)
 	settingsState = false;
 }
 
+extern void toggleRememberScreen();
+
 void aeLandingIconFunction(lv_event_t *e)
 {
-	// Your code here
+	// "Gauge Settings" Icon Pressed
+    if (settingsState) {
+        toggleRememberScreen();
+    }
 }
