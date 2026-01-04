@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_bootInitialScreen = NULL;lv_obj_t *ui_Spinner1 = NULL;lv_obj_t *ui_feedbackLabel = NULL;lv_obj_t *ui_wifiIcon = NULL;lv_obj_t *ui_settingsIcon = NULL;lv_obj_t *ui_aeLandingIcon = NULL;lv_obj_t *ui_SSIDLabel = NULL;lv_obj_t *ui_SSIDInputText = NULL;lv_obj_t *ui_SSIDPasswordLabel = NULL;lv_obj_t *ui_SSIDPasswordInputText = NULL;lv_obj_t *ui_Keyboard = NULL;lv_obj_t *ui_landingBackButton = NULL;lv_obj_t *ui_aeLandingBottomLabel = NULL;lv_obj_t *ui_aeLandingBottomIcon = NULL;
+lv_obj_t *ui_bootInitialScreen = NULL;lv_obj_t *ui_Spinner1 = NULL;lv_obj_t *ui_feedbackLabel = NULL;lv_obj_t *ui_wifiIcon = NULL;lv_obj_t *ui_settingsIcon = NULL;lv_obj_t *ui_aeLandingIcon = NULL;lv_obj_t *ui_SSIDLabel = NULL;lv_obj_t *ui_SSIDInputText = NULL;lv_obj_t *ui_SSIDPasswordLabel = NULL;lv_obj_t *ui_SSIDPasswordInputText = NULL;lv_obj_t *ui_Keyboard = NULL;lv_obj_t *ui_landingBackButton = NULL;lv_obj_t *ui_aeLandingBottomLabel = NULL;lv_obj_t *ui_aeLandingBottomIcon = NULL;lv_obj_t *ui_settingsCentralLabel = NULL;
 // event funtions
 void ui_event_wifiIcon( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -26,8 +26,8 @@ if ( event_code == LV_EVENT_PRESSED) {
 void ui_event_aeLandingIcon( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-if ( event_code == LV_EVENT_PRESSED) {
-      aeLandingIconFunction( e );
+if ( event_code == LV_EVENT_LONG_PRESSED) {
+      configureTPMS( e );
 }
 }
 
@@ -126,7 +126,7 @@ lv_img_set_src(ui_aeLandingIcon, &ui_img_ae_white_128_png);
 lv_obj_set_width( ui_aeLandingIcon, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_aeLandingIcon, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_aeLandingIcon, LV_ALIGN_CENTER );
-lv_obj_add_flag( ui_aeLandingIcon, LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
+lv_obj_add_flag( ui_aeLandingIcon, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
 lv_obj_clear_flag( ui_aeLandingIcon, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_SSIDLabel = lv_label_create(ui_bootInitialScreen);
@@ -232,7 +232,7 @@ ui_landingBackButton = lv_label_create(ui_bootInitialScreen);
 lv_obj_set_width( ui_landingBackButton, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_landingBackButton, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_landingBackButton, 0 );
-lv_obj_set_y( ui_landingBackButton, 160 );
+lv_obj_set_y( ui_landingBackButton, 180 );
 lv_obj_set_align( ui_landingBackButton, LV_ALIGN_CENTER );
 lv_label_set_text(ui_landingBackButton,"Back");
 lv_obj_add_flag( ui_landingBackButton, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_CLICKABLE );   /// Flags
@@ -275,6 +275,18 @@ lv_obj_add_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_HIDDEN );   /// Flags
 lv_obj_clear_flag( ui_aeLandingBottomIcon, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_img_set_zoom(ui_aeLandingBottomIcon,128);
 
+ui_settingsCentralLabel = lv_label_create(ui_bootInitialScreen);
+lv_obj_set_width( ui_settingsCentralLabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_settingsCentralLabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_settingsCentralLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_settingsCentralLabel,"WiFi: UNCONFIGURED");
+lv_obj_add_flag( ui_settingsCentralLabel, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_settingsCentralLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE );    /// Flags
+lv_obj_set_style_text_color(ui_settingsCentralLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_settingsCentralLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_align(ui_settingsCentralLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_settingsCentralLabel, &lv_font_montserrat_28, LV_PART_MAIN| LV_STATE_DEFAULT);
+
 lv_obj_add_event_cb(ui_wifiIcon, ui_event_wifiIcon, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_settingsIcon, ui_event_settingsIcon, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_aeLandingIcon, ui_event_aeLandingIcon, LV_EVENT_ALL, NULL);
@@ -305,5 +317,6 @@ ui_Keyboard= NULL;
 ui_landingBackButton= NULL;
 ui_aeLandingBottomLabel= NULL;
 ui_aeLandingBottomIcon= NULL;
+ui_settingsCentralLabel= NULL;
 
 }

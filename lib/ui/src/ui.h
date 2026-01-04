@@ -29,6 +29,7 @@ extern "C" {
 #include "ui_bootInitialScreen.h"
 #include "ui_batteryScreen.h"
 #include "ui_temperatureScreen.h"
+#include "ui_tpmsScreen.h"
 
 ///////////////////// VARIABLES ////////////////////
 
@@ -42,6 +43,7 @@ LV_IMG_DECLARE( ui_img_ae_white_128_png);   // assets/ae_white_128.png
 LV_IMG_DECLARE( ui_img_1917549703);   // assets/ae-map-marker-96.png
 LV_IMG_DECLARE( ui_img_2056808699);   // assets/ae-gauge-battery-128.png
 LV_IMG_DECLARE( ui_img_1965588767);   // assets/ae-fridge-180.png
+LV_IMG_DECLARE( ui_img_699809084);   // assets/ae-everest-250.png
 LV_IMG_DECLARE( ui_img_2930172);   // assets/ae-coolant-128.png
 LV_IMG_DECLARE( ui_img_2022370193);   // assets/ae-esp-now-96.png
 LV_IMG_DECLARE( ui_img_1749172309);   // assets/ae-gauge-settings-96.png

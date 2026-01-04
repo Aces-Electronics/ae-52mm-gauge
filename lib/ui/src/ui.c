@@ -35,6 +35,7 @@ lv_disp_set_theme(dispp, theme);
 ui_bootInitialScreen_screen_init();
 ui_batteryScreen_screen_init();
 ui_temperatureScreen_screen_init();
+ui_tpmsScreen_screen_init();
 ui____initial_actions0 = lv_obj_create(NULL);
 lv_disp_load_scr( ui_bootInitialScreen);
 }
@@ -43,4 +44,5 @@ void ui_destroy( void )
 {ui_bootInitialScreen_screen_destroy();
 ui_batteryScreen_screen_destroy();
 ui_temperatureScreen_screen_destroy();
+ui_tpmsScreen_screen_destroy();
 }

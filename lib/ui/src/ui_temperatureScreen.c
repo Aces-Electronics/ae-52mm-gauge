@@ -32,7 +32,7 @@ lv_obj_set_height( ui_TempTempArc, 480);
 lv_obj_set_align( ui_TempTempArc, LV_ALIGN_CENTER );
 lv_obj_clear_flag( ui_TempTempArc, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_arc_set_range(ui_TempTempArc, -10,10);
-lv_arc_set_value(ui_TempTempArc, 0);
+lv_arc_set_value(ui_TempTempArc, 35);
 lv_arc_set_bg_angles(ui_TempTempArc,45,315);
 lv_arc_set_mode(ui_TempTempArc, LV_ARC_MODE_SYMMETRICAL);
 lv_arc_set_rotation(ui_TempTempArc,90);

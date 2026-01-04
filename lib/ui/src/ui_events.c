@@ -170,3 +170,47 @@ void aeLandingIconFunction(lv_event_t *e)
         toggleRememberScreen();
     }
 }
+
+// ===============================
+// TPMS Configuration
+// ===============================
+
+extern void startTPMSPairing(void);
+extern void cancelTPMSPairing(void);
+extern void skipTPMSPosition(void);
+extern bool isTPMSPairingActive(void);
+extern const char* getTPMSPairingStatus(void);
+
+void configureTPMS(lv_event_t *e)
+{
+    LV_LOG_USER("TPMS CONFIGURATION REQUESTED");
+    
+    if (!settingsState) {
+        // Not in settings mode, ignore
+        return;
+    }
+    
+    // Hide normal settings icons
+    lv_obj_add_flag(ui_wifiIcon, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_settingsIcon, LV_OBJ_FLAG_HIDDEN);
+    
+    // Show spinner to indicate activity
+    lv_obj_clear_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+    
+    // Update feedback label
+    lv_label_set_text(ui_feedbackLabel, "TPMS PAIRING...");
+    lv_obj_clear_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+    
+    // Show bottom label for status messages
+    lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(ui_aeLandingBottomLabel, "Starting pairing wizard...");
+    
+    // Change Back button to Cancel
+    if (ui_landingBackButton) {
+        lv_label_set_text(ui_landingBackButton, "Cancel");
+    }
+    
+    // Start TPMS pairing
+    startTPMSPairing();
+}

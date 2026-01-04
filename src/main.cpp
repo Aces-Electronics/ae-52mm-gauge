@@ -15,10 +15,14 @@
 #include "ble_handler.h"
 #include "encoder.h"
 #include "pairing_handler.h"
+#include "tpms_handler.h"
 
 PairingHandler pairingHandler;
 bool g_isPaired = false;
 uint8_t g_pairedMac[6] = {0};
+
+// Forward declarations
+void tpmsDataCallback(TPMSPosition position, const TPMSSensor* sensor);
 
 String SSID_cpp = "MySSID";
 String PWD_cpp = "MyPassword";
@@ -47,8 +51,8 @@ const char *PWD_c = nullptr;
 #define SW 14
 
 // Encoder e(CLK, DT, SW, debounce, longPressLength)
-// Set Long Press to 3000ms (3 seconds) for Factory Reset safety
-Encoder e(CLK, DT, SW, 4, 3000);
+// Set debounce to 50ms for reliable rotation, Long Press to 3000ms (3 seconds) for Factory Reset safety
+Encoder e(CLK, DT, SW, 50, 3000);
 
 uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -144,7 +148,7 @@ bool g_hasTempData = false;
 // Remember Screen Logic
 bool g_rememberScreen = false;
 unsigned long g_lastScreenSwitchTime = 0;
-const unsigned long AUTO_SWITCH_DWELL_MS = 5000;
+const unsigned long AUTO_SWITCH_DWELL_MS = 10000; // 10 seconds after manual bezel use
 
 // Factory Reset Logic
 bool g_resetPending = false;
@@ -423,11 +427,287 @@ extern "C" void startPairingProcess() {
     g_scan_refresh_timer = lv_timer_create(scan_refresh_timer_cb, 1000, NULL);
 }
 
+// =====================================================================
+// TPMS Pairing Functions
+// =====================================================================
+
+// TPMS pairing state for UI
+static bool g_tpmsPairingActive = false;
+static char g_tpmsPairingStatus[64] = "";
+
+// Async callback to update TPMS status label (runs in LVGL thread)
+static void updateTPMSStatusLabel_cb(void* arg) {
+    (void)arg;
+    if (ui_aeLandingBottomLabel) {
+        lv_label_set_text(ui_aeLandingBottomLabel, g_tpmsPairingStatus);
+    }
+    if (ui_settingsCentralLabel) {
+        lv_label_set_text(ui_settingsCentralLabel, g_tpmsPairingStatus);
+    }
+    
+    // If pairing complete or cancelled, update UI
+    if (!g_tpmsPairingActive) {
+        if (ui_landingBackButton) {
+            lv_label_set_text(ui_landingBackButton, "Done");
+        }
+        if (ui_Spinner1) {
+            lv_obj_add_flag(ui_Spinner1, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+// TPMS pairing callback - called from TPMSHandler
+void tpmsPairingCallback(TPMSPosition position, TPMSPairingState state, float pressure) {
+    const char* posName = TPMS_POSITION_NAMES[position];
+    
+    switch (state) {
+        case PAIRING_SEARCHING:
+            snprintf(g_tpmsPairingStatus, sizeof(g_tpmsPairingStatus), 
+                     "Searching for %s...", posName);
+            Serial.println(g_tpmsPairingStatus);
+            break;
+            
+        case PAIRING_FOUND:
+            snprintf(g_tpmsPairingStatus, sizeof(g_tpmsPairingStatus), 
+                     "%s Found! (%.1f PSI)", posName, pressure);
+            Serial.println(g_tpmsPairingStatus);
+            break;
+            
+        case PAIRING_COMPLETE:
+            snprintf(g_tpmsPairingStatus, sizeof(g_tpmsPairingStatus), 
+                     "Pairing Complete!");
+            g_tpmsPairingActive = false;
+            Serial.println(g_tpmsPairingStatus);
+            break;
+            
+        case PAIRING_CANCELLED:
+            snprintf(g_tpmsPairingStatus, sizeof(g_tpmsPairingStatus), 
+                     "Pairing Cancelled");
+            g_tpmsPairingActive = false;
+            Serial.println(g_tpmsPairingStatus);
+            break;
+            
+        default:
+            break;
+    }
+    
+    // Update LVGL label via async call (thread-safe)
+    lv_async_call(updateTPMSStatusLabel_cb, NULL);
+}
+
+// TPMS data callback - called when sensor data is received (normal mode)
+// Helper prototype
+void triggerGlobalAlert();
+
+// Update TPMS UI Labels based on Mode
+void updateTPMSUI(void* arg) {
+    (void)arg;
+    char buf[16];
+    
+    // Determine effective mode
+    TPMSDisplayMode mode = tpmsHandler.displayMode;
+    
+    // Default Label
+    const char* modeLabel = "TPMS"; // Default
+    switch(mode) {
+        case DISPLAY_PSI: modeLabel = "TPMS"; break;
+        case DISPLAY_TEMP: modeLabel = "TEMP"; break;
+        case DISPLAY_VOLT: modeLabel = "BATT"; break;
+        case DISPLAY_AUTO: modeLabel = "AUTO"; break; // Will be overwritten if we cycle label
+    }
+
+    if (mode == DISPLAY_AUTO) {
+        // Cycle every 3 seconds
+        int seq = (millis() / 3000) % 3;
+        switch(seq) {
+            case 0: 
+                mode = DISPLAY_PSI; 
+                modeLabel = "TPMS"; 
+                break;
+            case 1: 
+                mode = DISPLAY_TEMP; 
+                modeLabel = "TEMP"; 
+                break;
+            case 2: 
+                mode = DISPLAY_VOLT; 
+                modeLabel = "BATT"; 
+                break;
+        }
+    }
+    
+    // Update Header Label
+    if (ui_TempNameLabel1) {
+        lv_label_set_text(ui_TempNameLabel1, modeLabel);
+    }
+    
+    // Helper to formatValue and Handle Alerts
+    auto formatValueAndCheckAlerts = [&](const TPMSSensor* s, lv_obj_t* label) {
+        if (!s || !s->configured || s->lastUpdate == 0) {
+            lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0); // Default White
+            return String("~");
+        }
+        
+        bool alert = false;
+        lv_color_t color = lv_color_hex(0xFFFFFF); // White
+        
+        // Check Conditions
+        // 1. Low Pressure (Baseline - 8)
+        if (s->baselinePsi > 5.0f) { // Only checking if baseline is set sensible
+             if (s->pressurePsi < (s->baselinePsi - 8.0f)) {
+                 alert = true;
+                 color = lv_color_hex(0xFF0000); // Red
+             }
+        }
+        
+        // 2. High Temp (> 80C)
+        if (s->temperature > 80) {
+            alert = true;
+            color = lv_color_hex(0xFF0000); // Red
+        }
+        
+        // 3. Low Battery (< 2.5V)
+        if (s->batteryVoltage < 2.5f) {
+            // Blink Logic (500ms cycle)
+            if ((millis() / 500) % 2) {
+                 color = lv_color_hex(0x555555); // Dim
+            } else {
+                 color = lv_color_hex(0xFF0000); // Red/White? Use Red if issue.
+                 if (!alert) color = lv_color_hex(0xFFFF00); // Yellow for battery? Or just blink white/grey
+                 // User said: "blink the PSI label ... when we detect low battery"
+            }
+            // If explicit battery issue, maybe force alert too?
+            // "below about 2.5v"
+        }
+        
+        lv_obj_set_style_text_color(label, color, 0);
+        
+        if (alert) {
+             extern void triggerGlobalAlert();
+             triggerGlobalAlert();
+        }
+        
+        char b[16];
+        switch(mode) {
+            case DISPLAY_PSI: snprintf(b, sizeof(b), "%.0f", s->pressurePsi); break;
+            case DISPLAY_TEMP: snprintf(b, sizeof(b), "%dC", s->temperature); break;
+            case DISPLAY_VOLT: snprintf(b, sizeof(b), "%.1fV", s->batteryVoltage); break;
+            default: return String("?");
+        }
+        return String(b);
+    };
+
+    if (ui_FLPSI) lv_label_set_text(ui_FLPSI, formatValueAndCheckAlerts(tpmsHandler.getSensor(TPMS_FL), ui_FLPSI).c_str());
+    if (ui_FRPSI) lv_label_set_text(ui_FRPSI, formatValueAndCheckAlerts(tpmsHandler.getSensor(TPMS_FR), ui_FRPSI).c_str());
+    if (ui_RRPSI) lv_label_set_text(ui_RRPSI, formatValueAndCheckAlerts(tpmsHandler.getSensor(TPMS_RR), ui_RRPSI).c_str());
+    if (ui_RRPSI1) lv_label_set_text(ui_RRPSI1, formatValueAndCheckAlerts(tpmsHandler.getSensor(TPMS_RL), ui_RRPSI1).c_str());
+}
+
+// Save Pressures Button Handler
+extern "C" void savePressuresFn(lv_event_t * e) {
+    // Iterate and save current pressure as baseline
+    int savedCount = 0;
+    for(int i=0; i<TPMS_COUNT; i++) {
+        TPMSSensor* s = tpmsHandler.getSensor((TPMSPosition)i);
+        if(s && s->configured && s->lastUpdate > 0) {
+            s->baselinePsi = s->pressurePsi;
+            savedCount++;
+        }
+    }
+    
+    if (savedCount > 0) {
+        tpmsHandler.saveToNVS();
+        if (ui_TempNameLabel1) lv_label_set_text(ui_TempNameLabel1, "SAVED");
+        
+        // Restore label after 2s?
+        // Let Auto Mode or next cycle fix it.
+    }
+}
+
+// Cycle Button Handler
+extern "C" void cycleTyreDataFn(lv_event_t * e) {
+    int m = (int)tpmsHandler.displayMode;
+    m++;
+    if (m > DISPLAY_AUTO) m = DISPLAY_PSI;
+    tpmsHandler.displayMode = (TPMSDisplayMode)m;
+    
+    // Update Title Label immediately for responsiveness
+    if (ui_TempNameLabel1) {
+        switch(tpmsHandler.displayMode) {
+            case DISPLAY_PSI: lv_label_set_text(ui_TempNameLabel1, "TPMS"); break;
+            case DISPLAY_TEMP: lv_label_set_text(ui_TempNameLabel1, "TEMP"); break;
+            case DISPLAY_VOLT: lv_label_set_text(ui_TempNameLabel1, "BATT"); break;
+            case DISPLAY_AUTO: lv_label_set_text(ui_TempNameLabel1, "AUTO"); break;
+        }
+    }
+    
+    // Force refresh
+    lv_async_call(updateTPMSUI, NULL);
+}
+
+// TPMS data callback - called when sensor data is received (normal mode)
+void tpmsDataCallback(TPMSPosition position, const TPMSSensor* sensor) {
+    if (!sensor) return;
+    
+    Serial.printf("[TPMS] %s: %.1f PSI, %d°C, %.1fV\n",
+                  TPMS_POSITION_SHORT[position], 
+                  sensor->pressurePsi, 
+                  sensor->temperature, 
+                  sensor->batteryVoltage);
+    
+    // Trigger UI update
+    lv_async_call(updateTPMSUI, NULL);
+    
+    // Trigger mesh indicator
+    extern void triggerTPMSMeshIndicator(bool active);
+    triggerTPMSMeshIndicator(true);
+    
+    // Auto-switch to TPMS Screen on data update (User Request)
+    if (screen_index != 3) {
+        screen_index = 3;
+        screen_change_requested = true;
+    }
+}
+
+// Start TPMS Pairing - call this from Settings UI
+extern "C" void startTPMSPairing() {
+    Serial.println("Starting TPMS Pairing Wizard...");
+    g_tpmsPairingActive = true;
+    tpmsHandler.setPairingCallback(tpmsPairingCallback);
+    tpmsHandler.setDataCallback(tpmsDataCallback);
+    tpmsHandler.startPairing();
+}
+
+// Skip current TPMS position - call from UI Skip button
+extern "C" void skipTPMSPosition() {
+    if (g_tpmsPairingActive) {
+        tpmsHandler.skipCurrentPosition();
+    }
+}
+
+// Cancel TPMS pairing - call from UI Cancel button
+extern "C" void cancelTPMSPairing() {
+    if (g_tpmsPairingActive) {
+        tpmsHandler.cancelPairing();
+        g_tpmsPairingActive = false;
+    }
+}
+
+// Check if TPMS pairing is active
+extern "C" bool isTPMSPairingActive() {
+    return g_tpmsPairingActive;
+}
+
+// Get current TPMS pairing status string
+extern "C" const char* getTPMSPairingStatus() {
+    return g_tpmsPairingStatus;
+}
+
 
 // Mesh indicator / heartbeat UI helpers
 static lv_timer_t *g_mesh_timer = NULL;
 static uint32_t g_shunt_expire_ms = 0; // millis when shunt mesh blinking should stop
 static uint32_t g_temp_expire_ms = 0;  // millis when temp mesh blinking should stop
+static uint32_t g_tpms_expire_ms = 0;  // millis when TPMS mesh blinking should stop
 static const uint32_t MESH_DURATION_MS = 20000; // 16 seconds
 static const uint32_t MESH_TOGGLE_MS = 500;     // toggle every 500ms -> 1Hz blink
 
@@ -435,6 +715,8 @@ static lv_timer_t *g_heartbeat_timer = NULL;
 static int g_heartbeat_step = 0;
 static const int HEARTBEAT_STEPS = 4;
 static const uint32_t HEARTBEAT_INTERVAL_MS = 200; // 200ms per phase
+
+
 
 // Helper: set common battery UI elements' text color (if object is present)
 static void set_battery_elements_color(lv_color_t color)
@@ -454,12 +736,14 @@ static void mesh_timer_cb(lv_timer_t *timer)
   uint32_t now = millis();
   bool shunt_active = (now <= g_shunt_expire_ms);
   bool temp_active = (now <= g_temp_expire_ms);
+  bool tpms_active = (now <= g_tpms_expire_ms);
 
-  // If BOTH expired, stop timer
-  if (!shunt_active && !temp_active)
+  // If ALL expired, stop timer
+  if (!shunt_active && !temp_active && !tpms_active)
   {
       if (ui_meshIndicator) lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
       if (ui_TempmeshIndicator) lv_obj_add_flag(ui_TempmeshIndicator, LV_OBJ_FLAG_HIDDEN);
+      if (ui_tpmsIndicator) lv_obj_add_flag(ui_tpmsIndicator, LV_OBJ_FLAG_HIDDEN);
 
       if (g_mesh_timer) {
           lv_timer_del(g_mesh_timer);
@@ -493,6 +777,37 @@ static void mesh_timer_cb(lv_timer_t *timer)
              lv_obj_add_flag(ui_TempmeshIndicator, LV_OBJ_FLAG_HIDDEN);
       }
   }
+
+  // Handle TPMS Indicator
+  if (ui_tpmsIndicator) {
+      if (!tpms_active) {
+          lv_obj_add_flag(ui_tpmsIndicator, LV_OBJ_FLAG_HIDDEN);
+      } else {
+          // Toggle
+          if (lv_obj_has_flag(ui_tpmsIndicator, LV_OBJ_FLAG_HIDDEN))
+             lv_obj_clear_flag(ui_tpmsIndicator, LV_OBJ_FLAG_HIDDEN);
+          else
+             lv_obj_add_flag(ui_tpmsIndicator, LV_OBJ_FLAG_HIDDEN);
+      }
+  }
+}
+
+// Trigger TPMS mesh indicator blinking
+// Trigger the mesh indicator animation
+void triggerTPMSMeshIndicator(bool active) {
+    (void)active; // Not used yet, but satisfies signature
+    auto triggerTPMS_cb = [](void* arg) {
+        (void)arg;
+        g_tpms_expire_ms = millis() + 10000;  // 10 second timeout
+        
+        if (ui_tpmsIndicator) {
+            lv_obj_clear_flag(ui_tpmsIndicator, LV_OBJ_FLAG_HIDDEN);
+            if (!g_mesh_timer) {
+                g_mesh_timer = lv_timer_create(mesh_timer_cb, MESH_TOGGLE_MS, NULL);
+            }
+        }
+    };
+    lv_async_call(triggerTPMS_cb, NULL);
 }
 
 // Heartbeat timer callback: steps through red/white flashes then stops
@@ -528,6 +843,17 @@ static void heartbeat_timer_cb(lv_timer_t *timer)
 
   g_heartbeat_step++;
 }
+
+// Helper to start global alert
+void triggerGlobalAlert() {
+    g_heartbeat_step = 0;
+    if (g_heartbeat_timer) {
+        lv_timer_del(g_heartbeat_timer);
+        g_heartbeat_timer = NULL;
+    }
+    g_heartbeat_timer = lv_timer_create(heartbeat_timer_cb, HEARTBEAT_INTERVAL_MS, NULL);
+}
+
 
 
 extern "C" void toggleRememberScreen() {
@@ -1311,6 +1637,21 @@ void Task_TFT(void *pvParameters)
   while (1)
   {
     lv_timer_handler();
+    
+    // Auto-Refresh TPMS UI if in Auto Mode
+    if (screen_index == 3 && tpmsHandler.displayMode == DISPLAY_AUTO) {
+        static unsigned long lastTPMSRefresh = 0;
+        if (millis() - lastTPMSRefresh > 500) { // 2Hz refresh to catch mode changes
+             lastTPMSRefresh = millis();
+             // Function is defined above, but we need to declare it or use name if visible
+             // It has C++ linkage.
+             // Declare prototype inside function or global?
+             // Since it's in same file above, just call it.
+             // lv_async_call expects a function pointer.
+             extern void updateTPMSUI(void* arg);
+             lv_async_call(updateTPMSUI, NULL);
+        }
+    }
 
     if (g_showQR) {
         g_showQR = false; // Trigger once
@@ -1338,9 +1679,9 @@ void Task_TFT(void *pvParameters)
       // Example logic for screen_index based on screen_index
       // Logic for screen_index clamping and Landing Page scrolling
       int min_index = -(int)connectedDevices.size();
-      // Update max index to 2 (Temp Screen)
-      if (screen_index > 2)
-        screen_index = 2;
+      // Update max index to 3 (TPMS Screen)
+      if (screen_index > 3)
+        screen_index = 3;
       else if (screen_index < min_index)
         screen_index = min_index;
       
@@ -1388,6 +1729,9 @@ void Task_TFT(void *pvParameters)
              }
         }
         break;
+      case 3:
+        changeScreen(ui_tpmsScreen, true, "TPMS Screen");
+        break;
 
       }
     }
@@ -1397,8 +1741,14 @@ void Task_TFT(void *pvParameters)
 
 void Task_main(void *pvParameters)
 {
+  Serial.println("Task_main: Started.");
   while (1)
   {
+    static bool firstRun = true;
+    if (firstRun) {
+        Serial.println("Task_main: First loop iteration.");
+        firstRun = false;
+    }
     if (!timerRunning)
     {
       startTime = millis(); // Start the timer
@@ -1439,12 +1789,22 @@ void Task_main(void *pvParameters)
       break;
 
     case LONG_PRESS:
-      Serial.println("Long Pressed - Reset Request");
-      g_resetPending = true;
-      g_resetPendingTime = millis();
-      // Switch to Landing Page to show warning
-      screen_index = 0;
-      screen_change_requested = true;
+      if (settingsState) {
+          // If in Settings Mode, Long Press triggers TPMS configuration
+          Serial.println("Long Pressed (Settings) - Configure TPMS");
+          // Use async call to safely interact with LVGL/UI
+          lv_async_call([](void*){ 
+              configureTPMS(NULL); 
+          }, NULL);
+      } else {
+          // Normal Mode: Factory Reset Request
+          Serial.println("Long Pressed - Reset Request");
+          g_resetPending = true;
+          g_resetPendingTime = millis();
+          // Switch to Landing Page to show warning
+          screen_index = 0;
+          screen_change_requested = true;
+      }
       break;
 
     case ENC_CW:
@@ -1455,7 +1815,7 @@ void Task_main(void *pvParameters)
       int next_index = screen_index + dir;
       // int min_idx = -(int)connectedDevices.size(); // REMOVED: User wants standard cycling only
       int min_idx = 0; 
-      int max_idx = 2; // Temp Screen
+      int max_idx = 3; // 0=Landing, 1=Battery, 2=Temp, 3=TPMS
 
       if (next_index > max_idx) screen_index = min_idx;       // Wrap to Min
       else if (next_index < min_idx) screen_index = max_idx;  // Wrap to Max
@@ -1536,6 +1896,9 @@ void Task_main(void *pvParameters)
       loopCounter = 0;
     }
 
+    // TPMS BLE scanning
+    tpmsHandler.update();
+
     vTaskDelay(10);
   }
 }
@@ -1546,6 +1909,14 @@ void setup()
   Serial.begin(115200); /* prepare for possible serial debug */
 
   delay(1800); // sit here for a bit to give USB Serial a chance to enumerate
+  Serial.println("BOOT: Starting setup...");
+  Serial.printf("BOOT: Free Heap Start: %d\n", ESP.getFreeHeap());
+
+  // Initialize TPMS Handler EARLY (BLE resource priority)
+  Serial.println("BOOT: TPMS Handler begin...");
+  tpmsHandler.begin();
+  tpmsHandler.setDataCallback(tpmsDataCallback);
+  Serial.println("BOOT: TPMS Handler done.");
 
   Serial.println();
 
@@ -1677,12 +2048,24 @@ void setup()
 
   ui_init();
 
+  // Initialize TPMS Handler (BLE init moved to top of setup)
+  // tpmsHandler.begin();
+  // tpmsHandler.setDataCallback(tpmsDataCallback);
+
   updateWiFiState();
 
   Serial.println("AE 52mm Gauge: Operational!");
+  Serial.printf("BOOT: Free Heap End Setup: %d\n", ESP.getFreeHeap());
 
-  xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 3, NULL, 0);
-  xTaskCreatePinnedToCore(Task_main, "Task_main", 40960, NULL, 3, NULL, 1);
+  // Reduce stack sizes to fit in memory (40k -> 10k, 20k -> 10k)
+  // Check return values
+  BaseType_t res1 = xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 10240, NULL, 3, NULL, 0);
+  if (res1 != pdPASS) Serial.println("BOOT: Task_TFT creation FAILED!");
+  else Serial.println("BOOT: Task_TFT created.");
+
+  BaseType_t res2 = xTaskCreatePinnedToCore(Task_main, "Task_main", 10240, NULL, 3, NULL, 1);
+  if (res2 != pdPASS) Serial.println("BOOT: Task_main creation FAILED!");
+  else Serial.println("BOOT: Task_main created.");
 }
 
 void loop()

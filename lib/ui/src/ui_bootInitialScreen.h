@@ -34,6 +34,7 @@ extern void ui_event_landingBackButton( lv_event_t * e);
 extern lv_obj_t *ui_landingBackButton;
 extern lv_obj_t *ui_aeLandingBottomLabel;
 extern lv_obj_t *ui_aeLandingBottomIcon;
+extern lv_obj_t *ui_settingsCentralLabel;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus
