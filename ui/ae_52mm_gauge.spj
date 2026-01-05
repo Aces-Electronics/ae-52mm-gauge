@@ -5993,7 +5993,7 @@
               },
               {
                 "nid": -542571781,
-                "flags": 17,
+                "flags": 51,
                 "strtype": "OBJECT/Size",
                 "intarray": [
                   210,
@@ -6648,8 +6648,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  -135,
-                  60
+                  -110,
+                  90
                 ],
                 "InheritedType": 7
               },
@@ -6870,8 +6870,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  -130,
-                  90
+                  -110,
+                  120
                 ],
                 "InheritedType": 7
               },
@@ -7092,8 +7092,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  135,
-                  60
+                  110,
+                  90
                 ],
                 "InheritedType": 7
               },
@@ -7517,8 +7517,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  130,
-                  90
+                  110,
+                  120
                 ],
                 "InheritedType": 7
               },
@@ -12329,7 +12329,7 @@
     "theme_color1": 5,
     "theme_color2": 0,
     "custom_variable_prefix": "uic",
-    "backup_cnt": 1916,
+    "backup_cnt": 1919,
     "autosave_cnt": 0,
     "group_color_cnt": 0,
     "lvgl_version": "8.3.6",

@@ -21,6 +21,7 @@ class Encoder {
 
   ESP32Encoder encoder;
   int64_t lastCount;
+  unsigned long lastRotationTime;
 
   InputActions readSwitch();
 };

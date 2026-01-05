@@ -7,7 +7,8 @@ Encoder::Encoder(uint8_t clockPin, uint8_t dataPin, uint8_t switchPin,
       switchPin(switchPin),
       debounce(debounce),
       longPressLength(longPressLength),
-      lastCount(0) {
+      lastCount(0),
+      lastRotationTime(0) {
   
   // Configure Switch
   pinMode(switchPin, INPUT_PULLUP);
@@ -22,14 +23,20 @@ Encoder::Encoder(uint8_t clockPin, uint8_t dataPin, uint8_t switchPin,
 InputActions Encoder::read() {
   int64_t newCount = encoder.getCount();
   
-  // Check for rotation (process one tick per call)
-  if (newCount > lastCount) {
-    lastCount++;
-    return ENC_CW;
-  }
-  if (newCount < lastCount) {
-    lastCount--;
-    return ENC_CCW;
+  // Rotation debounce: require 200ms between screen switches
+  const unsigned long ROTATION_DEBOUNCE_MS = 200;
+  
+  // Check for rotation
+  if (newCount != lastCount) {
+    bool isCW = (newCount > lastCount);
+    lastCount = newCount;  // Consume all counts
+    
+    // Only trigger if debounce time has passed
+    if (millis() - lastRotationTime >= ROTATION_DEBOUNCE_MS) {
+      lastRotationTime = millis();
+      return isCW ? ENC_CW : ENC_CCW;
+    }
+    // Else: rotation happened too fast, ignore it
   }
   
   // If no rotation pending, check switch

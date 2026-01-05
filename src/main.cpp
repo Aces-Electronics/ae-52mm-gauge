@@ -975,6 +975,10 @@ static void lv_update_shunt_ui_cb(void *user_data)
   if (!p)
     return;
 
+  // SAFETY: Enforce null termination on strings to prevent buffer overruns/crashes
+  p->name[sizeof(p->name) - 1] = '\0';
+  p->runFlatTime[sizeof(p->runFlatTime) - 1] = '\0';
+
   // AUTO-SWITCH and AUTO-LOCK Logic:
   
   // AUTO-SWITCH and AUTO-LOCK Logic:
