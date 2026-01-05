@@ -141,7 +141,8 @@ std::map<String, DeviceInfo> connectedDevices;
 
 // Cached data for Swing Arc
 float g_lastTemp = -999.0f; // invalid init
-bool enable_ui_temperatureScreen = true; // Enable by default for now
+bool enable_ui_temperatureScreen = false; // Wait for data
+bool enable_ui_tpmsScreen = false; // Wait for data
 struct_message_ae_temp_sensor g_lastTempData; // Cache for UI refresh
 bool g_hasTempData = false;
 
@@ -1303,8 +1304,28 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     memcpy(&tmp, incomingData, toCopy);
     tmp.runFlatTime[sizeof(tmp.runFlatTime) - 1] = '\0'; // ensure NUL
 
+    // Enable Screens
+    enable_ui_batteryScreen = true;
+    
+    // Check for valid TPMS data (non-zero timestamp)
+    bool hasTPMS = false;
+    for(int i=0; i<4; i++) {
+        if(tmp.tpmsLastUpdate[i] > 0) hasTPMS = true;
+    }
+    enable_ui_tpmsScreen = hasTPMS;
+
+    // Extract TPMS Data from Shunt
+    for(int i=0; i<4; i++) {
+         tpmsHandler.updateSensorData(i, 
+             tmp.tpmsPressurePsi[i], 
+             tmp.tpmsTemperature[i], 
+             tmp.tpmsVoltage[i], 
+             tmp.tpmsLastUpdate[i]
+         );
+    }
+
     // Debug
-    // Debug
+    Serial.println("Gauge RX: ID 11 (Shunt Data)");
     // Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
     //               tmp.batteryVoltage,
     //               tmp.batteryCurrent,
@@ -1353,6 +1374,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
           return;
       }
       memcpy(&tmp, incomingData, sizeof(tmp));
+      enable_ui_temperatureScreen = true;
       
       // Atomic print to prevent garbling
       char bigBuff[256];
@@ -1702,7 +1724,11 @@ void Task_TFT(void *pvParameters)
       case 0:
       default: // Handle negative indices as Landing Page
         if (screen_index <= 0) {
-             _ui_screen_change( &ui_bootInitialScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_bootInitialScreen_screen_init);
+             // Dynamic direction based on encoder
+             if (bezel_left)
+                 _ui_screen_change( &ui_bootInitialScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, &ui_bootInitialScreen_screen_init);
+             else
+                 _ui_screen_change( &ui_bootInitialScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, &ui_bootInitialScreen_screen_init);
              
              // If Reset is Pending, Show Warning immediately after loading screen
              if (g_resetPending) {
@@ -1739,11 +1765,24 @@ void Task_TFT(void *pvParameters)
   }
 }
 
+// Thread-safe callbacks for LVGL
+static void update_wifi_icon_cb(void * data) {
+    lv_img_set_src(ui_wifiIcon, data);
+}
+
+static void update_feedback_label_cb(void * data) {
+    const char* text = (const char*)data;
+    lv_label_set_text(ui_feedbackLabel, text);
+}
+
 void Task_main(void *pvParameters)
 {
   Serial.println("Task_main: Started.");
   while (1)
   {
+    // Checkpoint 1
+    // Serial.println("L1");
+    
     static bool firstRun = true;
     if (firstRun) {
         Serial.println("Task_main: First loop iteration.");
@@ -1811,27 +1850,44 @@ void Task_main(void *pvParameters)
     case ENC_CCW:
       // screen_index += (action == ENC_CW) ? 1 : -1;
       // Looping Logic:
+      // Dynamic Screen Skippping
       int dir = (action == ENC_CW) ? 1 : -1;
-      int next_index = screen_index + dir;
-      // int min_idx = -(int)connectedDevices.size(); // REMOVED: User wants standard cycling only
-      int min_idx = 0; 
-      int max_idx = 3; // 0=Landing, 1=Battery, 2=Temp, 3=TPMS
-
-      if (next_index > max_idx) screen_index = min_idx;       // Wrap to Min
-      else if (next_index < min_idx) screen_index = max_idx;  // Wrap to Max
-      else screen_index = next_index;
-
-      Serial.printf("Encoder %s %d\n", (action == ENC_CW) ? "CW" : "CCW", screen_index);
-      bezel_right = (action == ENC_CW);
-      bezel_left = (action == ENC_CCW);
-      screen_change_requested = true;
-      g_lastScreenSwitchTime = millis(); // Manual interaction resets auto-switch timer
+      int next = screen_index;
+      int count = 0;
+      bool enabled = false;
       
-      // Update NVS if Remember Screen is active
-      if (g_rememberScreen && !settingsState) {
-           preferences.begin("ae", false);
-           preferences.putInt("last_scr", screen_index);
-           preferences.end();
+      do {
+          next += dir;
+          if (next > 3) next = 0;
+          if (next < 0) next = 3;
+          
+          if (next == 0) enabled = enable_ui_bootInitialScreen;
+          else if (next == 1) enabled = enable_ui_batteryScreen;
+          else if (next == 2) enabled = enable_ui_temperatureScreen;
+          else if (next == 3) enabled = enable_ui_tpmsScreen;
+          
+          if (enabled) break;
+          count++;
+      } while (count < 5); // Safety break
+
+      // Only switch if we found a valid new screen
+      if (enabled && next != screen_index) {
+          screen_index = next;
+          Serial.printf("Encoder %s %d\n", (action == ENC_CW) ? "CW" : "CCW", screen_index);
+          bezel_right = (action == ENC_CW);
+          bezel_left = (action == ENC_CCW);
+          screen_change_requested = true;
+          g_lastScreenSwitchTime = millis();
+          
+          // Update NVS if Remember Screen is active
+          if (g_rememberScreen && !settingsState) {
+               preferences.begin("ae", false);
+               preferences.putInt("last_scr", screen_index);
+               preferences.end();
+          }
+      } else {
+          // No valid screen change (or redundant)
+          // Do nothing visually
       }
       break;
     }
@@ -1851,13 +1907,13 @@ void Task_main(void *pvParameters)
 
     if (connectWiFi && wifiSetToOn)
     {
-      lv_img_set_src(ui_wifiIcon, &ui_img_807091229); // WiFi on
+      lv_async_call(update_wifi_icon_cb, (void*)&ui_img_807091229); // WiFi on (Thread Safe)
       WiFi.begin(SSID, PWD);
       connectWiFi = false;
       checkIP = true;
     }
 
-    if (checkIP)
+    if (checkIP && (loopCounter % 200 == 0)) // Check every 2s
     {
       if (WiFi.localIP().toString() != "0.0.0.0")
       {
@@ -1866,7 +1922,7 @@ void Task_main(void *pvParameters)
       }
       else
       {
-        lv_label_set_text(ui_feedbackLabel, "WiFi: NO IP ADDRESS");
+        lv_async_call(update_feedback_label_cb, (void*)"WiFi: NO IP ADDRESS"); // Thread Safe
       }
     }
 
@@ -1897,9 +1953,17 @@ void Task_main(void *pvParameters)
     }
 
     // TPMS BLE scanning
+    // TPMS BLE scanning
+    // Serial.println("L2"); // Pre-TPMS
     tpmsHandler.update();
+    // Serial.println("L3"); // Post-TPMS
 
     vTaskDelay(10);
+    // Serial.println("L5"); // End Loop
+    
+    if (loopCounter % 100 == 0) {
+        // Serial.printf("Task_main: Heartbeat (Loop %d)\n", loopCounter);
+    }
   }
 }
 
@@ -1920,7 +1984,7 @@ void setup()
 
   Serial.println();
 
-  preferences.begin("ae", true);
+  preferences.begin("ae", false);
   wifiSetToOn = preferences.getBool("p_wifiOn");
   SSID = preferences.getString("p_ssid", "no_p_ssid");
   PWD = preferences.getString("p_pwd", "no_p_pwd");
@@ -2055,6 +2119,11 @@ void setup()
   updateWiFiState();
 
   Serial.println("AE 52mm Gauge: Operational!");
+
+  // Send TPMS Config to Shunt (Sync on Boot)
+  Serial.println("BOOT: Syncing TPMS Config to Shunt...");
+  tpmsHandler.sendConfigToShunt();
+
   Serial.printf("BOOT: Free Heap End Setup: %d\n", ESP.getFreeHeap());
 
   // Reduce stack sizes to fit in memory (40k -> 10k, 20k -> 10k)

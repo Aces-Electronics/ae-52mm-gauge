@@ -1,33 +1,39 @@
 #include "encoder.h"
 
-InputActions Encoder::read() {
-  static uint32_t timeCapture;
-  static bool clockLastState = HIGH;
-  bool clockState = digitalRead(clockPin);
-
-  if ((millis() - timeCapture) < debounce) return NOTHING;
-
-  timeCapture = millis();
-
-  if (clockState != clockLastState) {
-    clockLastState = clockState;
-    if (!clockState) return digitalRead(dataPin) ? ENC_CCW : ENC_CW;
-  }
-  if (clockState) return readSwitch();
-
-  return NOTHING;
-}
-
 Encoder::Encoder(uint8_t clockPin, uint8_t dataPin, uint8_t switchPin,
                  uint16_t debounce, uint16_t longPressLength)
     : clockPin(clockPin),
       dataPin(dataPin),
       switchPin(switchPin),
       debounce(debounce),
-      longPressLength(longPressLength) {
-  pinMode(clockPin, INPUT_PULLUP);
-  pinMode(dataPin, INPUT_PULLUP);
+      longPressLength(longPressLength),
+      lastCount(0) {
+  
+  // Configure Switch
   pinMode(switchPin, INPUT_PULLUP);
+
+  // Configure Hardware Encoder
+  ESP32Encoder::useInternalWeakPullResistors = UP;
+  encoder.attachHalfQuad(dataPin, clockPin); // DT, CLK
+  encoder.setFilter(1023); // Max debounce filter
+  encoder.setCount(0);
+}
+
+InputActions Encoder::read() {
+  int64_t newCount = encoder.getCount();
+  
+  // Check for rotation (process one tick per call)
+  if (newCount > lastCount) {
+    lastCount++;
+    return ENC_CW;
+  }
+  if (newCount < lastCount) {
+    lastCount--;
+    return ENC_CCW;
+  }
+  
+  // If no rotation pending, check switch
+  return readSwitch();
 }
 
 InputActions Encoder::readSwitch() {

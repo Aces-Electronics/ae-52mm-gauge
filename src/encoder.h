@@ -2,6 +2,7 @@
 #define ENCODER_H
 
 #include <Arduino.h>
+#include <ESP32Encoder.h>
 
 enum InputActions { NOTHING = 0, SINGLE_PRESS, LONG_PRESS, ENC_CW, ENC_CCW };
 
@@ -17,6 +18,9 @@ class Encoder {
   uint8_t switchPin;
   uint16_t debounce;
   uint16_t longPressLength;
+
+  ESP32Encoder encoder;
+  int64_t lastCount;
 
   InputActions readSwitch();
 };

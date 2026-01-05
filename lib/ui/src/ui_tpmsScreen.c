@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_tpmsScreen = NULL;lv_obj_t *ui_TempNameLabel1 = NULL;lv_obj_t *ui_aeIconBatteryScreen3 = NULL;lv_obj_t *ui_Image3 = NULL;lv_obj_t *ui_FLPSI = NULL;lv_obj_t *ui_tpmsIndicator = NULL;lv_obj_t *ui_FRPSI = NULL;lv_obj_t *ui_RRPSI = NULL;lv_obj_t *ui_RRPSI1 = NULL;
+lv_obj_t *ui_tpmsScreen = NULL;lv_obj_t *ui_TempNameLabel1 = NULL;lv_obj_t *ui_aeIconBatteryScreen3 = NULL;lv_obj_t *ui_Image3 = NULL;lv_obj_t *ui_FLPSI = NULL;lv_obj_t *ui_tpmsIndicator = NULL;lv_obj_t *ui_FRPSI = NULL;lv_obj_t *ui_RRPSI = NULL;lv_obj_t *ui_RRPSI1 = NULL;lv_obj_t *ui_tpmsCentralLabel = NULL;
 // event funtions
 void ui_event_aeIconBatteryScreen3( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -132,6 +132,18 @@ lv_obj_set_style_text_opa(ui_RRPSI1, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_decor(ui_RRPSI1, LV_TEXT_DECOR_NONE, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_RRPSI1, &ui_font_AE64BOLD, LV_PART_MAIN| LV_STATE_DEFAULT);
 
+ui_tpmsCentralLabel = lv_label_create(ui_tpmsScreen);
+lv_obj_set_width( ui_tpmsCentralLabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_tpmsCentralLabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_tpmsCentralLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_tpmsCentralLabel,"");
+lv_obj_add_flag( ui_tpmsCentralLabel, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_tpmsCentralLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE );    /// Flags
+lv_obj_set_style_text_color(ui_tpmsCentralLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_tpmsCentralLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_align(ui_tpmsCentralLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_tpmsCentralLabel, &lv_font_montserrat_28, LV_PART_MAIN| LV_STATE_DEFAULT);
+
 lv_obj_add_event_cb(ui_aeIconBatteryScreen3, ui_event_aeIconBatteryScreen3, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_Image3, ui_event_Image3, LV_EVENT_ALL, NULL);
 
@@ -151,5 +163,6 @@ ui_tpmsIndicator= NULL;
 ui_FRPSI= NULL;
 ui_RRPSI= NULL;
 ui_RRPSI1= NULL;
+ui_tpmsCentralLabel= NULL;
 
 }

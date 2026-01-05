@@ -71,7 +71,20 @@ typedef struct struct_message_ae_smart_shunt_1 {
   float lastDayWh;
   float lastWeekWh;
   char name[24];   // Device name (e.g., "AE Smart Shunt" or custom)
+  
+  // TPMS Data (Offloaded)
+  float tpmsPressurePsi[4];
+  int tpmsTemperature[4];
+  float tpmsVoltage[4];
+  uint32_t tpmsLastUpdate[4];
 } __attribute__((packed)) struct_message_ae_smart_shunt_1;
+
+typedef struct struct_message_tpms_config {
+  int messageID; // unique ID (e.g., 99)
+  uint8_t macs[4][6];      // MAC Addresses
+  float baselines[4];      // Baseline Pressures
+  bool configured[4];      // Is sensor active?
+} __attribute__((packed)) struct_message_tpms_config;
 
 typedef struct struct_message_ae_temp_sensor {
   uint8_t id;

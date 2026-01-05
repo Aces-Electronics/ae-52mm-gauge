@@ -30,6 +30,7 @@ extern lv_obj_t *ui_meshIndicator;
 extern lv_obj_t *ui_BarDayLabel;
 extern lv_obj_t *ui_BarDayBottomLabel;
 extern lv_obj_t *ui_BarWeekLabel;
+extern lv_obj_t *ui_batteryCentralLabel;
 extern lv_obj_t *ui_BarWeekBottomLabel;
 // CUSTOM VARIABLES
 

@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_temperatureScreen = NULL;lv_obj_t *ui_TempTempArc = NULL;lv_obj_t *ui_TempSwingArc = NULL;lv_obj_t *ui_TempNameLabel = NULL;lv_obj_t *ui_aeIconBatteryScreen2 = NULL;lv_obj_t *ui_Image2 = NULL;lv_obj_t *ui_TempBattSOCLabel = NULL;lv_obj_t *ui_TempTempLabel = NULL;lv_obj_t *ui_TempmeshIndicator = NULL;
+lv_obj_t *ui_temperatureScreen = NULL;lv_obj_t *ui_TempTempArc = NULL;lv_obj_t *ui_TempSwingArc = NULL;lv_obj_t *ui_TempNameLabel = NULL;lv_obj_t *ui_aeIconBatteryScreen2 = NULL;lv_obj_t *ui_Image2 = NULL;lv_obj_t *ui_TempBattSOCLabel = NULL;lv_obj_t *ui_TempTempLabel = NULL;lv_obj_t *ui_TempmeshIndicator = NULL;lv_obj_t *ui_tempCentralLabel = NULL;
 // event funtions
 void ui_event_aeIconBatteryScreen2( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -139,6 +139,18 @@ lv_obj_set_style_text_color(ui_TempmeshIndicator, lv_color_hex(0xFFFFFF), LV_PAR
 lv_obj_set_style_text_opa(ui_TempmeshIndicator, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_TempmeshIndicator, &lv_font_montserrat_26, LV_PART_MAIN| LV_STATE_DEFAULT);
 
+ui_tempCentralLabel = lv_label_create(ui_temperatureScreen);
+lv_obj_set_width( ui_tempCentralLabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_tempCentralLabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_tempCentralLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_tempCentralLabel,"");
+lv_obj_add_flag( ui_tempCentralLabel, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_tempCentralLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE );    /// Flags
+lv_obj_set_style_text_color(ui_tempCentralLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_tempCentralLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_align(ui_tempCentralLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_tempCentralLabel, &lv_font_montserrat_28, LV_PART_MAIN| LV_STATE_DEFAULT);
+
 lv_obj_add_event_cb(ui_aeIconBatteryScreen2, ui_event_aeIconBatteryScreen2, LV_EVENT_ALL, NULL);
 
 }
@@ -157,5 +169,6 @@ ui_Image2= NULL;
 ui_TempBattSOCLabel= NULL;
 ui_TempTempLabel= NULL;
 ui_TempmeshIndicator= NULL;
+ui_tempCentralLabel= NULL;
 
 }

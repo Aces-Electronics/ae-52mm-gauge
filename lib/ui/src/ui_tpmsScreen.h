@@ -24,6 +24,7 @@ extern lv_obj_t *ui_tpmsIndicator;
 extern lv_obj_t *ui_FRPSI;
 extern lv_obj_t *ui_RRPSI;
 extern lv_obj_t *ui_RRPSI1;
+extern lv_obj_t *ui_tpmsCentralLabel;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

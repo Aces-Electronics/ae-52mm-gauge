@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_batteryScreen = NULL;lv_obj_t *ui_SBattVArc = NULL;lv_obj_t *ui_SA1Arc = NULL;lv_obj_t *ui_battVLabelSensor = NULL;lv_obj_t *ui_battALabelSensor = NULL;lv_obj_t *ui_batteryVLabel = NULL;lv_obj_t *ui_batteryALabel = NULL;lv_obj_t *ui_startBatteryLabel = NULL;lv_obj_t *ui_aeIconBatteryScreen1 = NULL;lv_obj_t *ui_Image1 = NULL;lv_obj_t *ui_BatteryTime = NULL;lv_obj_t *ui_SOCLabel = NULL;lv_obj_t *ui_meshIndicator = NULL;lv_obj_t *ui_BarDayLabel = NULL;lv_obj_t *ui_BarDayBottomLabel = NULL;lv_obj_t *ui_BarWeekLabel = NULL;lv_obj_t *ui_BarWeekBottomLabel = NULL;
+lv_obj_t *ui_batteryScreen = NULL;lv_obj_t *ui_SBattVArc = NULL;lv_obj_t *ui_SA1Arc = NULL;lv_obj_t *ui_battVLabelSensor = NULL;lv_obj_t *ui_battALabelSensor = NULL;lv_obj_t *ui_batteryVLabel = NULL;lv_obj_t *ui_batteryALabel = NULL;lv_obj_t *ui_startBatteryLabel = NULL;lv_obj_t *ui_aeIconBatteryScreen1 = NULL;lv_obj_t *ui_Image1 = NULL;lv_obj_t *ui_BatteryTime = NULL;lv_obj_t *ui_SOCLabel = NULL;lv_obj_t *ui_meshIndicator = NULL;lv_obj_t *ui_BarDayLabel = NULL;lv_obj_t *ui_BarDayBottomLabel = NULL;lv_obj_t *ui_BarWeekLabel = NULL;lv_obj_t *ui_batteryCentralLabel = NULL;lv_obj_t *ui_BarWeekBottomLabel = NULL;
 // event funtions
 void ui_event_aeIconBatteryScreen1( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -231,6 +231,18 @@ lv_obj_set_style_text_opa(ui_BarWeekLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_align(ui_BarWeekLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_BarWeekLabel, &lv_font_montserrat_26, LV_PART_MAIN| LV_STATE_DEFAULT);
 
+ui_batteryCentralLabel = lv_label_create(ui_batteryScreen);
+lv_obj_set_width( ui_batteryCentralLabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_batteryCentralLabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_batteryCentralLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_batteryCentralLabel,"");
+lv_obj_add_flag( ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_batteryCentralLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE );    /// Flags
+lv_obj_set_style_text_color(ui_batteryCentralLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_opa(ui_batteryCentralLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_align(ui_batteryCentralLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_batteryCentralLabel, &lv_font_montserrat_28, LV_PART_MAIN| LV_STATE_DEFAULT);
+
 ui_BarWeekBottomLabel = lv_label_create(ui_batteryScreen);
 lv_obj_set_width( ui_BarWeekBottomLabel, 80);
 lv_obj_set_height( ui_BarWeekBottomLabel, 31);
@@ -271,6 +283,7 @@ ui_meshIndicator= NULL;
 ui_BarDayLabel= NULL;
 ui_BarDayBottomLabel= NULL;
 ui_BarWeekLabel= NULL;
+ui_batteryCentralLabel= NULL;
 ui_BarWeekBottomLabel= NULL;
 
 }

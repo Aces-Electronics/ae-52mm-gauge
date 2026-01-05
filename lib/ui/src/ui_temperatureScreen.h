@@ -23,6 +23,7 @@ extern lv_obj_t *ui_Image2;
 extern lv_obj_t *ui_TempBattSOCLabel;
 extern lv_obj_t *ui_TempTempLabel;
 extern lv_obj_t *ui_TempmeshIndicator;
+extern lv_obj_t *ui_tempCentralLabel;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus
