@@ -77,6 +77,11 @@ typedef struct struct_message_ae_smart_shunt_1 {
   int tpmsTemperature[4];
   float tpmsVoltage[4];
   uint32_t tpmsLastUpdate[4];
+
+  // Relayed Temp Sensor Data
+  float tempSensorTemperature;
+  uint8_t tempSensorBatteryLevel;
+  uint32_t tempSensorLastUpdate;
 } __attribute__((packed)) struct_message_ae_smart_shunt_1;
 
 typedef struct struct_message_tpms_config {

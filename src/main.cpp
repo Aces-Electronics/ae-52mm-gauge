@@ -271,9 +271,23 @@ void executePairing(String targetMacStr, String deviceType) {
 
     // 4. Generate QR Payload
     // Include type in payload? App expects JSON valid for that device.
-    // Shunt: {"gauge_mac":"...", "key":"..."}
-    // Temp:  {"gauge_mac":"...", "key":"..."} (Same format)
     String myMac = WiFi.macAddress();
+    
+    // IF pairing a Temp Sensor, we want it to talk to the Shunt (if we have one paired)
+    if (deviceType.indexOf("Temp") >= 0) {
+        // Check if we have a paired Shunt
+        if (g_pairedMac[0] != 0 || g_pairedMac[1] != 0) {
+            char shuntMacStr[18];
+            snprintf(shuntMacStr, sizeof(shuntMacStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+                g_pairedMac[0], g_pairedMac[1], g_pairedMac[2], 
+                g_pairedMac[3], g_pairedMac[4], g_pairedMac[5]);
+            myMac = String(shuntMacStr);
+            Serial.printf("Redirecting Temp Sensor Pairing to Shunt MAC: %s\n", myMac.c_str());
+        } else {
+             Serial.println("Warning: Pairing Temp Sensor but no Shunt paired! Defaulting to Gauge MAC.");
+        }
+    }
+
     // Generate QR Payload
     // Format: {"gauge_mac":"<MAC>","key":"<KEY>"}
     // Note: User reported corruption "gaug1:61:46:7C".
@@ -1326,6 +1340,30 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
              tmp.tpmsVoltage[i], 
              tmp.tpmsLastUpdate[i]
          );
+    }
+
+    // Checking Relayed Temp Sensor Data
+    if (tmp.tempSensorLastUpdate > 0) {
+        // We have valid relayed data
+        struct_message_ae_temp_sensor relayed;
+        memset(&relayed, 0, sizeof(relayed));
+        relayed.id = 22;
+        relayed.temperature = tmp.tempSensorTemperature;
+        relayed.batteryLevel = tmp.tempSensorBatteryLevel;
+        relayed.updateInterval = 0; // Unknown or irrelevant for display
+        // Name we can default or leave empty, UI handles it
+        // strncpy(relayed.name, "Relayed", sizeof(relayed.name));
+
+        // Update Global State
+        memcpy(&g_lastTempData, &relayed, sizeof(relayed));
+        g_hasTempData = true;
+
+        // Trigger UI Update
+        struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
+        if (tData) {
+            memcpy(tData, &relayed, sizeof(struct_message_ae_temp_sensor));
+            lv_async_call(lv_update_temp_ui_cb, tData);
+        }
     }
 
     // Debug
