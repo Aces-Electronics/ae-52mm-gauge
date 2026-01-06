@@ -272,6 +272,7 @@ void executePairing(String targetMacStr, String deviceType) {
     // 4. Generate QR Payload
     // Include type in payload? App expects JSON valid for that device.
     String myMac = WiFi.macAddress();
+    bool redirectingToShunt = false;
     
     // IF pairing a Temp Sensor, we want it to talk to the Shunt (if we have one paired)
     if (deviceType.indexOf("Temp") >= 0) {
@@ -282,6 +283,7 @@ void executePairing(String targetMacStr, String deviceType) {
                 g_pairedMac[0], g_pairedMac[1], g_pairedMac[2], 
                 g_pairedMac[3], g_pairedMac[4], g_pairedMac[5]);
             myMac = String(shuntMacStr);
+            redirectingToShunt = true;
             Serial.printf("Redirecting Temp Sensor Pairing to Shunt MAC: %s\n", myMac.c_str());
         } else {
              Serial.println("Warning: Pairing Temp Sensor but no Shunt paired! Defaulting to Gauge MAC.");
@@ -291,11 +293,41 @@ void executePairing(String targetMacStr, String deviceType) {
     // Generate QR Payload
     // Format: {"gauge_mac":"<MAC>","key":"<KEY>"}
     // Note: User reported corruption "gaug1:61:46:7C".
-    // 1. Ensure buffer size is adequate. 512 is plenty.
-    // 2. Ensure format string is correct.
+    // 4. Construct JSON Payload
+    // Format: {"gauge_mac":"XX:XX...","key":"..."}
+    
+    // Determine the key we actually use for the payload
+    String keyToSend;
+    
+    // 4. Construct JSON Payload
+    // Format: {"gauge_mac":"XX:XX...","key":"..."}
+    
+    // Always use the generated key (Secure)
+    char keyHexBuffer[33]; 
+    for(int i=0; i<16; i++) sprintf(&keyHexBuffer[i*2], "%02X", key[i]);
+    keyHexBuffer[32] = '\0';
+    
+    keyToSend = String(keyHexBuffer);
+    
+    // IF Redirecting to Shunt -> Inform Shunt of the New Peer!
+    if (redirectingToShunt) {
+        Serial.println("Informing Shunt of new Temp Sensor peer...");
+        
+        struct_message_add_peer addMsg;
+        addMsg.messageID = 200;
+        parseBytes(targetMacStr.c_str(), ':', addMsg.mac, 6, 16);
+        memcpy(addMsg.key, key, 16);
+        addMsg.channel = 0;
+        addMsg.encrypt = true;
+        
+        esp_err_t res = esp_now_send(g_pairedMac, (uint8_t *)&addMsg, sizeof(addMsg));
+        if (res == ESP_OK) Serial.println("Sent ADD_PEER command to Shunt");
+        else Serial.printf("Failed to send ADD_PEER command: %d\n", res);
+    }
+    
     snprintf(g_qrPayload, sizeof(g_qrPayload), 
              "{\"gauge_mac\":\"%s\",\"key\":\"%s\"}", 
-             myMac.c_str(), keyHex.c_str());
+             myMac.c_str(), keyToSend.c_str());
              
     Serial.println("QR GENERATED:");
     Serial.printf("  Target: %s\n", targetMacStr.c_str());

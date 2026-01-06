@@ -100,4 +100,12 @@ typedef struct struct_message_ae_temp_sensor {
   char name[16];
 } __attribute__((packed)) struct_message_ae_temp_sensor;
 
+typedef struct struct_message_add_peer {
+  int messageID; // 200
+  uint8_t mac[6];
+  uint8_t key[16];
+  uint8_t channel;
+  bool encrypt;
+} __attribute__((packed)) struct_message_add_peer;
+
 #endif // SHARED_DEFS_H
