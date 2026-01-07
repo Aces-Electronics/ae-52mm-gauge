@@ -152,10 +152,10 @@ ui_BatteryTime = lv_label_create(ui_batteryScreen);
 lv_obj_set_width( ui_BatteryTime, LV_SIZE_CONTENT);  /// 210
 lv_obj_set_height( ui_BatteryTime, LV_SIZE_CONTENT);   /// 28
 lv_obj_set_x( ui_BatteryTime, 0 );
-lv_obj_set_y( ui_BatteryTime, 60 );
+lv_obj_set_y( ui_BatteryTime, 30 );
 lv_obj_set_align( ui_BatteryTime, LV_ALIGN_CENTER );
 lv_label_set_long_mode(ui_BatteryTime,LV_LABEL_LONG_DOT);
-lv_label_set_text(ui_BatteryTime,"> 7 days");
+lv_label_set_text(ui_BatteryTime,"1d 11h until full");
 lv_obj_clear_flag( ui_BatteryTime, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
 lv_obj_set_scroll_dir(ui_BatteryTime, LV_DIR_HOR);
 lv_obj_set_style_text_color(ui_BatteryTime, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
@@ -166,6 +166,8 @@ lv_obj_set_style_text_font(ui_BatteryTime, &lv_font_montserrat_26, LV_PART_MAIN|
 ui_SOCLabel = lv_label_create(ui_batteryScreen);
 lv_obj_set_width( ui_SOCLabel, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_SOCLabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_SOCLabel, 0 );
+lv_obj_set_y( ui_SOCLabel, -20 );
 lv_obj_set_align( ui_SOCLabel, LV_ALIGN_CENTER );
 lv_label_set_text(ui_SOCLabel,"100%");
 lv_obj_clear_flag( ui_SOCLabel, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN );    /// Flags
@@ -190,7 +192,7 @@ ui_BarDayLabel = lv_label_create(ui_batteryScreen);
 lv_obj_set_width( ui_BarDayLabel, 80);
 lv_obj_set_height( ui_BarDayLabel, 31);
 lv_obj_set_x( ui_BarDayLabel, -110 );
-lv_obj_set_y( ui_BarDayLabel, 90 );
+lv_obj_set_y( ui_BarDayLabel, 80 );
 lv_obj_set_align( ui_BarDayLabel, LV_ALIGN_CENTER );
 lv_label_set_long_mode(ui_BarDayLabel,LV_LABEL_LONG_DOT);
 lv_label_set_text(ui_BarDayLabel,"-5");
@@ -205,7 +207,7 @@ ui_BarDayBottomLabel = lv_label_create(ui_batteryScreen);
 lv_obj_set_width( ui_BarDayBottomLabel, 80);
 lv_obj_set_height( ui_BarDayBottomLabel, 31);
 lv_obj_set_x( ui_BarDayBottomLabel, -110 );
-lv_obj_set_y( ui_BarDayBottomLabel, 120 );
+lv_obj_set_y( ui_BarDayBottomLabel, 110 );
 lv_obj_set_align( ui_BarDayBottomLabel, LV_ALIGN_CENTER );
 lv_label_set_long_mode(ui_BarDayBottomLabel,LV_LABEL_LONG_DOT);
 lv_label_set_text(ui_BarDayBottomLabel,"Wh/d");
@@ -220,7 +222,7 @@ ui_BarWeekLabel = lv_label_create(ui_batteryScreen);
 lv_obj_set_width( ui_BarWeekLabel, 80);
 lv_obj_set_height( ui_BarWeekLabel, 31);
 lv_obj_set_x( ui_BarWeekLabel, 110 );
-lv_obj_set_y( ui_BarWeekLabel, 90 );
+lv_obj_set_y( ui_BarWeekLabel, 80 );
 lv_obj_set_align( ui_BarWeekLabel, LV_ALIGN_CENTER );
 lv_label_set_long_mode(ui_BarWeekLabel,LV_LABEL_LONG_DOT);
 lv_label_set_text(ui_BarWeekLabel,"100");
@@ -247,7 +249,7 @@ ui_BarWeekBottomLabel = lv_label_create(ui_batteryScreen);
 lv_obj_set_width( ui_BarWeekBottomLabel, 80);
 lv_obj_set_height( ui_BarWeekBottomLabel, 31);
 lv_obj_set_x( ui_BarWeekBottomLabel, 110 );
-lv_obj_set_y( ui_BarWeekBottomLabel, 120 );
+lv_obj_set_y( ui_BarWeekBottomLabel, 110 );
 lv_obj_set_align( ui_BarWeekBottomLabel, LV_ALIGN_CENTER );
 lv_label_set_long_mode(ui_BarWeekBottomLabel,LV_LABEL_LONG_DOT);
 lv_label_set_text(ui_BarWeekBottomLabel,"Wh/w");

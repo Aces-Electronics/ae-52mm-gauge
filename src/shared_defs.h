@@ -81,6 +81,7 @@ typedef struct struct_message_ae_smart_shunt_1 {
   // Relayed Temp Sensor Data
   float tempSensorTemperature;
   uint8_t tempSensorBatteryLevel;
+  uint32_t tempSensorUpdateInterval; // Added for Staleness Logic
   uint32_t tempSensorLastUpdate;
 } __attribute__((packed)) struct_message_ae_smart_shunt_1;
 

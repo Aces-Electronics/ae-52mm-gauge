@@ -23,6 +23,9 @@ uint8_t g_pairedMac[6] = {0};
 
 // Forward declarations
 void tpmsDataCallback(TPMSPosition position, const TPMSSensor* sensor);
+void setShuntUIState(bool dataReceived);
+void setTempUIState(bool dataReceived);
+void setTPMSUIState(bool dataReceived);
 
 String SSID_cpp = "MySSID";
 String PWD_cpp = "MyPassword";
@@ -97,7 +100,7 @@ bool SSIDPasswordUpdated = false;
 bool syncFlash = false;
 bool validLocation = false;
 bool enable_ui_bootInitialScreen = true;
-bool enable_ui_batteryScreen = false;
+bool enable_ui_batteryScreen = true;
 bool enable_ui_oilScreen = false;
 bool enable_ui_coolantScreen = false;
 bool enable_ui_turboExhaustScreen = false;
@@ -147,7 +150,8 @@ struct_message_ae_temp_sensor g_lastTempData; // Cache for UI refresh
 bool g_hasTempData = false;
 
 // Remember Screen Logic
-bool g_rememberScreen = false;
+bool g_rememberScreen = true;
+bool dataAutoSwitched = false;
 unsigned long g_lastScreenSwitchTime = 0;
 const unsigned long AUTO_SWITCH_DWELL_MS = 10000; // 10 seconds after manual bezel use
 
@@ -172,7 +176,10 @@ bool g_scanningMode = false;
 // Cached data for Starter Battery Animation
 // Since telemetry arrives every 10s, we cannot drive the 3s/3s cycle from the data callback.
 // We must cache the data and use a high-frequency timer.
-char g_cachedRunFlatTime[40] = "Calculating...";
+char g_cachedRunFlatTime[40] = "Waiting for shunt data...";
+bool g_shuntDataReceived = false;
+bool g_tempDataReceived = false;
+bool g_tpmsDataReceived = false;
 float g_cachedStarterVoltage = 10.00f; // Default "disconnected"
 lv_timer_t *g_starterAnimationTimer = NULL;
 
@@ -204,6 +211,7 @@ void hexStringToBytes(String hex, uint8_t* bytes, int len) {
 
 // Queue for QR Code drawing
 bool g_showQR = false;
+bool g_qrActive = false; // Persistent state for visibility guards
 char g_qrPayload[512] = "";
 
 // Helper to generate QR logic (Moved from startPairingProcess)
@@ -344,12 +352,14 @@ void executePairing(String targetMacStr, String deviceType) {
     
     // Set flag and payload for Task_TFT to handle
     // g_qrPayload is already populated via snprintf above.
+    g_qrActive = true; 
     g_showQR = true;
     Serial.println("Pairing Process Initiated. Waiting for render task...");
 }
 
 extern "C" void hideQRCode() {
     g_showQR = false;
+    g_qrActive = false; // Release visibility guards
     // Force a full redraw to clear the direct TFT pixels
     if (lv_scr_act()) {
         lv_obj_invalidate(lv_scr_act());
@@ -485,7 +495,7 @@ static char g_tpmsPairingStatus[64] = "";
 // Async callback to update TPMS status label (runs in LVGL thread)
 static void updateTPMSStatusLabel_cb(void* arg) {
     (void)arg;
-    if (ui_aeLandingBottomLabel) {
+    if (ui_aeLandingBottomLabel && !g_qrActive) {
         lv_label_set_text(ui_aeLandingBottomLabel, g_tpmsPairingStatus);
     }
     if (ui_settingsCentralLabel) {
@@ -549,6 +559,13 @@ void triggerGlobalAlert();
 // Update TPMS UI Labels based on Mode
 void updateTPMSUI(void* arg) {
     (void)arg;
+
+    // Unhide UI on first data packet
+    if (!g_tpmsDataReceived) {
+        g_tpmsDataReceived = true;
+        setTPMSUIState(true);
+    }
+
     char buf[16];
     
     // Determine effective mode
@@ -971,12 +988,106 @@ void toggleBacklightDim()
   }
 }
 
+void setShuntUIState(bool dataReceived) {
+    if (!ui_batteryScreen) return;
+    
+    if (dataReceived) {
+        lv_obj_clear_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_battVLabelSensor, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_battALabelSensor, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_batteryVLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_batteryALabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_startBatteryLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_aeIconBatteryScreen1, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_Image1, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_BarDayLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_BarDayBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_BarWeekLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_BarWeekBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_battVLabelSensor, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_battALabelSensor, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_batteryVLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_batteryALabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_startBatteryLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_aeIconBatteryScreen1, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_Image1, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_BarDayLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_BarDayBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_BarWeekLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_BarWeekBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        
+        lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(ui_batteryCentralLabel, "Waiting for shunt data...");
+        lv_label_set_text(ui_BatteryTime, ""); // Clear the sub-label
+    }
+}
+
+void setTempUIState(bool dataReceived) {
+    if (!ui_temperatureScreen) return;
+
+    if (dataReceived) {
+        lv_obj_clear_flag(ui_TempTempArc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_TempSwingArc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_TempNameLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_aeIconBatteryScreen2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_Image2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_TempTempLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_tempCentralLabel, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(ui_TempTempArc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_TempSwingArc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_TempNameLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_aeIconBatteryScreen2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_Image2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_TempTempLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_TempBattSOCLabel, LV_OBJ_FLAG_HIDDEN);
+
+        lv_obj_clear_flag(ui_tempCentralLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(ui_tempCentralLabel, "Waiting for temp data...");
+    }
+}
+
+void setTPMSUIState(bool dataReceived) {
+    if (!ui_tpmsScreen) return;
+
+    if (dataReceived) {
+        lv_obj_clear_flag(ui_TempNameLabel1, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_aeIconBatteryScreen3, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_Image3, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_FLPSI, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_FRPSI, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_RRPSI, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_RRPSI1, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_tpmsCentralLabel, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(ui_TempNameLabel1, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_aeIconBatteryScreen3, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_Image3, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_FLPSI, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_FRPSI, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_RRPSI, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_RRPSI1, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_tpmsIndicator, LV_OBJ_FLAG_HIDDEN);
+
+        lv_obj_clear_flag(ui_tpmsCentralLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(ui_tpmsCentralLabel, "Waiting for TPMS data...");
+    }
+}
+
 // get_bar_label_y removed
 
 // Timer Callback for Smooth Starter Battery Animation
 static void update_battery_label_timer_cb(lv_timer_t *timer)
 {
-  if (!ui_BatteryTime) return;
+  if (!ui_BatteryTime || !g_shuntDataReceived) return;
 
   // Starter Battery Display Logic
   // If voltage is NOT 10.00V (allowing for small float error), checks are active.
@@ -1021,6 +1132,12 @@ static void lv_update_shunt_ui_cb(void *user_data)
   if (!p)
     return;
 
+  // Unhide UI on first data packet
+  if (!g_shuntDataReceived) {
+      g_shuntDataReceived = true;
+      setShuntUIState(true);
+  }
+
   // SAFETY: Enforce null termination on strings to prevent buffer overruns/crashes
   p->name[sizeof(p->name) - 1] = '\0';
   p->runFlatTime[sizeof(p->runFlatTime) - 1] = '\0';
@@ -1059,15 +1176,25 @@ static void lv_update_shunt_ui_cb(void *user_data)
       // lv_obj_set_style_text_color(ui_landingBackButton, lv_color_hex(0x00FF00), LV_PART_MAIN);
   }
 
+// Change: Outer Arc now displays SOC (0-100%) instead of Voltage
+// ...
   // Use the same UI updates you used in Task_TFT, running here in LVGL context.
   // Check if we should update the landing label (only if not scrolling through devices)
-  if (screen_index > 0) {
+  if (screen_index > 0 && !g_qrActive) {
       lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
       lv_label_set_text_fmt(ui_aeLandingBottomLabel, "%s: %.2fV  %.2fA  %.2fW",
                             p->name[0] ? p->name : "AE Smart Shunt",
                             p->batteryVoltage,
                             p->batteryCurrent,
                             p->batteryPower);
+  }
+  
+  // FORCE HIDE 'Waiting' Label (Robustness against desync)
+  // This ensures that even if flags were toggled incorrectly elsewhere,
+  // receiving fresh data ALWAYS clears the waiting message.
+  if (ui_batteryCentralLabel && !lv_obj_has_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN)) {
+      lv_obj_add_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+      // Serial.println("[DEBUG] Forced Hiding of Waiting Label");
   }
 
   // Atomic Logging to prevent interleaving
@@ -1087,6 +1214,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
     "Last Hour      : %.2f Wh\n"
     "Last Day       : %.2f Wh\n"
     "Last Week      : %.2f Wh\n"
+    "Relayed Temp   : %.1f C (Age: %u ms)\n"
     "===================\n",
     p->name[0] ? p->name : "AE Smart Shunt",
     p->messageID,
@@ -1100,7 +1228,9 @@ static void lv_update_shunt_ui_cb(void *user_data)
     p->runFlatTime,
     p->lastHourWh,
     p->lastDayWh,
-    p->lastWeekWh
+    p->lastWeekWh,
+    p->tempSensorTemperature,
+    p->tempSensorLastUpdate
   );
   Serial.print(logBuf);
   // Duplicate print removed
@@ -1231,6 +1361,12 @@ static void lv_update_temp_ui_cb(void *user_data)
     struct_message_ae_temp_sensor *p = (struct_message_ae_temp_sensor *)user_data;
     if (!p) return;
 
+    // Unhide UI on first data packet
+    if (!g_tempDataReceived) {
+        g_tempDataReceived = true;
+        setTempUIState(true);
+    }
+
     // Auto-Switch Logic
     bool allowSwitch = !settingsState && !g_rememberScreen;
     bool dwellPassed = (millis() - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS);
@@ -1249,9 +1385,20 @@ static void lv_update_temp_ui_cb(void *user_data)
         lv_label_set_text(ui_landingBackButton, "Done");
     }
 
+    // STALENESS CHECK
+    // We repurpose batteryVoltage to hold AGE (passed from OnDataRecv)
+    // We use updateInterval to hold the sensor's reported interval.
+    uint32_t age_ms = (uint32_t)p->batteryVoltage; 
+    uint32_t interval_ms = p->updateInterval;
+    if (interval_ms == 0) interval_ms = 300000; // Default 5 mins if unknown
+    
+    // Stale if Age > Interval + 60s Buffer
+    bool isStale = (age_ms > (interval_ms + 60000)); 
+    
     // Update Temperature Arc & Label
     lv_arc_set_value(ui_TempTempArc, (int)p->temperature);
     lv_label_set_text_fmt(ui_TempTempLabel, "%.1f C", p->temperature);
+    lv_obj_set_style_text_color(ui_TempTempLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN); // Always White
 
     // Update Swing Arc
     if (g_lastTemp > -900.0f) {
@@ -1274,10 +1421,18 @@ static void lv_update_temp_ui_cb(void *user_data)
     }
 
     // Mesh Indicator (Blinking)
-    // Use reported interval + 20% buffer (min 2s buffer)
-    uint32_t buffer = p->updateInterval / 5;
-    if (buffer < 2000) buffer = 2000;
-    g_temp_expire_ms = millis() + p->updateInterval + buffer;
+    // Relayed data comes frequently from Shunt (every 1-5s).
+    // If FRESH: Keep blinking (extend expiry).
+    // If STALE: Let it expire (Stop blinking / Hide).
+    if (!isStale) {
+        g_temp_expire_ms = millis() + 5000;
+        
+        // Ensure timer is running if it stopped
+        if (!g_mesh_timer && ui_TempmeshIndicator) {
+             g_mesh_timer = lv_timer_create(mesh_timer_cb, 500, NULL); // Hardcode 500ms or use MESH_TOGGLE_MS constant checking if avail
+        }
+    }
+    // Else: Do NOT extend expiry. g_temp_expire_ms will pass, and mesh_timer_cb will Hide the indicator.
     
     // Debug
     // Serial.printf("Next Packet Expire: %d ms (Interval %d)\n", g_temp_expire_ms - millis(), p->updateInterval);
@@ -1319,8 +1474,16 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     }
     
     struct_message_ae_smart_shunt_1 incomingReadings;
+    memset(&incomingReadings, 0, sizeof(incomingReadings)); // Clear to avoid garbage
     
-    memcpy(&incomingReadings, incomingData, sizeof(incomingReadings));
+    // Safety Check: Size Mismatch
+    if (len != sizeof(incomingReadings)) {
+        // Serial.printf("[ERROR] Size Mismatch! Rx: %d, Exp: %d\n", len, sizeof(incomingReadings));
+        if (len < sizeof(incomingReadings)) return; // Too short, discard.
+    }
+    
+    // Safe Copy (Limit to struct size)
+    memcpy(&incomingReadings, incomingData, (len < sizeof(incomingReadings)) ? len : sizeof(incomingReadings));
 
   // Protocol Separation Security Check:
   // If we are strictly paired, we MUST ignore "Discovery Beacons" (ID 33).
@@ -1374,21 +1537,30 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
          );
     }
 
-    // Checking Relayed Temp Sensor Data
-    if (tmp.tempSensorLastUpdate > 0) {
+    // Checking Relayed Temp Sensor Data 
+    // Age of 0xFFFFFFFF means "Never updated" or "Sentinel". 
+    // We only enable the screen if we have a valid non-sentinel age AND it's fresh enough (< 180s).
+    bool hasValidTemp = (tmp.tempSensorLastUpdate > 0 && tmp.tempSensorLastUpdate != 0xFFFFFFFF && tmp.tempSensorLastUpdate < 180000);
+    Serial.printf("[DEBUG] Temp Update: Age=%u, Valid=%d\n", tmp.tempSensorLastUpdate, hasValidTemp);
+    
+    enable_ui_temperatureScreen = hasValidTemp;
+    g_hasTempData = hasValidTemp;
+
+    if (hasValidTemp) {
         // We have valid relayed data
         struct_message_ae_temp_sensor relayed;
-        memset(&relayed, 0, sizeof(relayed));
+        
+        // Preserve existing name from global state (set by direct RX Case 22)
+        memcpy(&relayed, &g_lastTempData, sizeof(relayed));
+        
         relayed.id = 22;
         relayed.temperature = tmp.tempSensorTemperature;
         relayed.batteryLevel = tmp.tempSensorBatteryLevel;
-        relayed.updateInterval = 0; // Unknown or irrelevant for display
-        // Name we can default or leave empty, UI handles it
-        // strncpy(relayed.name, "Relayed", sizeof(relayed.name));
-
+        relayed.updateInterval = tmp.tempSensorUpdateInterval; // Actual Interval
+        relayed.batteryVoltage = (float)tmp.tempSensorLastUpdate; // Store AGE in unused float field
+        
         // Update Global State
         memcpy(&g_lastTempData, &relayed, sizeof(relayed));
-        g_hasTempData = true;
 
         // Trigger UI Update
         struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
@@ -1786,7 +1958,7 @@ void Task_TFT(void *pvParameters)
       // g_scanningMode = (screen_index <= 0);
       
       // Update label if on Landing Page (0)
-      if (screen_index == 0) {
+      if (screen_index == 0 && !g_qrActive) {
           lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
           lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE Network: %d Device(s) Found", connectedDevices.size());
       }
@@ -1862,20 +2034,24 @@ void Task_main(void *pvParameters)
         Serial.println("Task_main: First loop iteration.");
         firstRun = false;
     }
-    if (!timerRunning)
-    {
-      startTime = millis(); // Start the timer
-      timerRunning = true;
+    
+    
+    // Auto-Switch to Battery Screen when Data Arrives (Only if Auto-Switch is ENABLED)
+    if (!g_rememberScreen && !dataAutoSwitched && screen_index <= 0 && enable_ui_batteryScreen) {
+        screen_index = 1; // Battery Screen
+        bezel_right = true; // Animate Right
+        screen_change_requested = true;
+        dataAutoSwitched = true;
+        Serial.println("Auto-Switching to Battery Screen (Data Received)");
     }
-
-    // Check if 10 seconds (10000 milliseconds) have passed
-    if (timerRunning && (millis() - startTime >= 10000))
-    {
-      // 10 seconds have elapsed, do something here
-      screen_index = 0; // reset the encoder counter ater 10 seconds
-      // bleHandler.startScan(5); // ToDo: enable BLE or AE mesh, one only
-      timerRunning = false; // Reset timer if you want to run again
+    
+    /* REMOVED: Old Debug Timer that forced Screen 0
+    if (!timerRunning) { startTime = millis(); timerRunning = true; }
+    if (timerRunning && (millis() - startTime >= 10000)) {
+      screen_index = 0;
+      timerRunning = false; 
     }
+    */
 
     // Timeout for reset pending (5 seconds)
     if (g_resetPending && (millis() - g_resetPendingTime > 5000)) {
@@ -1948,6 +2124,9 @@ void Task_main(void *pvParameters)
       if (enabled && next != screen_index) {
           screen_index = next;
           Serial.printf("Encoder %s %d\n", (action == ENC_CW) ? "CW" : "CCW", screen_index);
+          
+          // Manual selection recorded, no need to auto-switch back during this session
+          
           bezel_right = (action == ENC_CW);
           bezel_left = (action == ENC_CCW);
           screen_change_requested = true;
@@ -2064,10 +2243,11 @@ void setup()
   PWD = preferences.getString("p_pwd", "no_p_pwd");
 
   // Load Remember Screen
-  g_rememberScreen = preferences.getBool("remember_scr", false);
+  g_rememberScreen = preferences.getBool("rem_scr", false);
   if (g_rememberScreen) {
       screen_index = preferences.getInt("last_scr", 1); // Default to Gauge (1) if enabled but invalid
       screen_change_requested = true;
+      dataAutoSwitched = true; // Manual / Restored state persists
       Serial.printf("Restoring Last Screen: %d\n", screen_index);
   }
 
@@ -2126,6 +2306,12 @@ void setup()
               securePeer.encrypt = true;
               memcpy(securePeer.lmk, keyBytes, 16);
               
+              // CRITICAL FIX: Delete existing peer first to prevent "ESP_ERR_ESP_NOW_EXIST"
+              // This is common if Shunt and Temp Sensor share the same MAC (during testing).
+              if (esp_now_is_peer_exist(mBytes)) {
+                  esp_now_del_peer(mBytes);
+              }
+              
               if (esp_now_add_peer(&securePeer) == ESP_OK) {
                   Serial.printf("BOOT: Restored %s Peer [MAC: %s]\n", label.c_str(), macStr.c_str());
                   g_isPaired = true;
@@ -2160,6 +2346,8 @@ void setup()
   pin_init();
   setBacklightBrightness(255); // bright
 
+  // Restore Last Screen Preference (Already handled above with dataAutoSwitched safety)
+
   // Init Display
   gfx->begin();
 
@@ -2185,6 +2373,12 @@ void setup()
   lv_indev_drv_register(&indev_drv);
 
   ui_init();
+  setShuntUIState(false);
+  setTempUIState(false);
+  setTPMSUIState(false);
+  
+  // Init Hardware Input (Encoder/Button)
+  e.begin();
 
   // Initialize TPMS Handler (BLE init moved to top of setup)
   // tpmsHandler.begin();

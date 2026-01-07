@@ -9,7 +9,10 @@ Encoder::Encoder(uint8_t clockPin, uint8_t dataPin, uint8_t switchPin,
       longPressLength(longPressLength),
       lastCount(0),
       lastRotationTime(0) {
-  
+  // Empty Constructor (Move hardware init to begin())
+}
+
+void Encoder::begin() {
   // Configure Switch
   pinMode(switchPin, INPUT_PULLUP);
 
