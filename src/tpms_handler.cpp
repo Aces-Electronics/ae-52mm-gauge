@@ -166,6 +166,15 @@ void TPMSHandler::update() {
             }
         }
     }
+    
+    // Auto-Advance Logic
+    if (pairingActive && pairingState == PAIRING_FOUND) {
+        if (millis() - lastPairingSuccessTime > 2000) {
+           Serial.println("[TPMS] Auto-advancing to next position...");
+           advanceToNextPosition(); // Don't use skipCurrentPosition(), it clears the config!
+        }
+    }
+    
     // Normal Mode: Passive (Do nothing, wait for ESP-NOW)
 }
 
@@ -241,6 +250,7 @@ void TPMSHandler::onSensorDiscovered(const uint8_t* mac, float voltage, int temp
             
             pairedMacsThisSession.insert(macStr.c_str());
             pairingState = PAIRING_FOUND;
+            lastPairingSuccessTime = millis();
             if (pairingCallback) pairingCallback(currentPairingPosition, PAIRING_FOUND, pressure);
             
             // Advance automatically after 2s
@@ -261,9 +271,17 @@ void TPMSHandler::updateSensorData(int pos, float pressure, int temp, float volt
     // If shuntTs is different from lastShuntTimestamp, it's a new packet
     if (shuntTs != sensors[pos].lastShuntTimestamp) {
         sensors[pos].lastShuntTimestamp = shuntTs;
-        sensors[pos].pressurePsi = pressure;
-        sensors[pos].temperature = temp;
-        sensors[pos].batteryVoltage = volt;
+        
+        if (shuntTs == 0xFFFFFFFE) {
+            // Configured but Waiting for Data
+            sensors[pos].pressurePsi = -1.0f;
+            sensors[pos].batteryVoltage = 0.0f;
+            sensors[pos].temperature = 0;
+        } else {
+            sensors[pos].pressurePsi = pressure;
+            sensors[pos].temperature = temp;
+            sensors[pos].batteryVoltage = volt;
+        }
         sensors[pos].lastUpdate = millis(); // Fresh update at Gauge time
         
         // Notify Data Callback
@@ -292,11 +310,33 @@ void TPMSHandler::sendConfigToShunt() {
         Serial.println("[TPMS] Sending to Broadcast");
     }
     
-    esp_err_t result = esp_now_send(dest, (uint8_t*)&config, sizeof(config));
-    if (result == ESP_OK) {
-        Serial.println("[TPMS] Config Sent Successfully");
-    } else {
-        Serial.printf("[TPMS] Config Send Failed: 0x%x\n", result);
+    // Debug: Print Config MACs
+    for(int i=0; i<4; i++) {
+         Serial.printf("  Send Pos %d: %02X:%02X:%02X:%02X:%02X:%02X (En: %d)\n", i,
+            config.macs[i][0], config.macs[i][1], config.macs[i][2],
+            config.macs[i][3], config.macs[i][4], config.macs[i][5],
+            config.configured[i]);
+    }
+
+    // Reliability: Retry send 3 times
+    for (int retry=0; retry<3; retry++) {
+        esp_err_t result = esp_now_send(dest, (uint8_t*)&config, sizeof(config));
+        if (result == ESP_OK) {
+            Serial.printf("[TPMS] Config Send (Attempt %d) Success\n", retry+1);
+            break; // Stop on success? No, ESP-NOW "Success" just means queued.
+            // Actually, for critical config, sending multiple times is safer against RF loss.
+            // Let's send at least twice.
+            if (retry == 0) delay(20); // Small gap
+        } else {
+            Serial.printf("[TPMS] Config Send (Attempt %d) Failed: 0x%x\n", retry+1, result);
+            delay(50);
+        }
+    }
+    
+    // FINAL FALLBACK: Broadcast (In case of Encryption Mismatch)
+    if (g_isPaired) {
+         Serial.println("[TPMS] Sending to Broadcast (Fallback)...");
+         esp_now_send(broadcastAddress, (uint8_t*)&config, sizeof(config));
     }
 }
 

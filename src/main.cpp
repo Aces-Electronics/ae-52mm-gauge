@@ -82,6 +82,12 @@ Arduino_ST7701_RGBPanel *gfx = new Arduino_ST7701_RGBPanel(
 static const uint16_t screenWidth = 480;
 static const uint16_t screenHeight = 480;
 
+// Queue for UI Updates to avoid calling LVGL from ISR/WiFi Task
+struct UIQueueEvent {
+    uint8_t type; // 1=Shunt, 2=Temp
+    void* data;
+};
+QueueHandle_t g_uiQueue;
 bool screen_change_requested = false;
 
 static lv_disp_draw_buf_t draw_buf;
@@ -154,6 +160,14 @@ bool g_rememberScreen = true;
 bool dataAutoSwitched = false;
 unsigned long g_lastScreenSwitchTime = 0;
 const unsigned long AUTO_SWITCH_DWELL_MS = 10000; // 10 seconds after manual bezel use
+const unsigned long ROTATION_INTERVAL_MS = 5000; // 5 seconds per screen in auto-rotation
+const unsigned long DATA_STALENESS_THRESHOLD_MS = 15000; // 15 seconds (Shunt) or 30s (Temp) to consider data fresh
+
+unsigned long g_lastRotationTime = 0;
+unsigned long g_lastShuntRxTime = 0;
+unsigned long g_lastTempRxTime = 0;
+unsigned long g_lastTPMSRxTime = 0;
+bool g_isAutoRotating = false;
 
 // Factory Reset Logic
 bool g_resetPending = false;
@@ -328,9 +342,18 @@ void executePairing(String targetMacStr, String deviceType) {
         addMsg.channel = 0;
         addMsg.encrypt = true;
         
-        esp_err_t res = esp_now_send(g_pairedMac, (uint8_t *)&addMsg, sizeof(addMsg));
-        if (res == ESP_OK) Serial.println("Sent ADD_PEER command to Shunt");
-        else Serial.printf("Failed to send ADD_PEER command: %d\n", res);
+        // Retry Sending to Shunt (Critical Step)
+        for(int r=0; r<3; r++) {
+            esp_err_t res = esp_now_send(g_pairedMac, (uint8_t *)&addMsg, sizeof(addMsg));
+            if (res == ESP_OK) {
+                Serial.printf("Sent ADD_PEER command to Shunt (Attempt %d)\n", r+1);
+                // We don't break immediately, sending multiple times ensures delivery without ACK
+                if (r == 0) delay(20); 
+            } else {
+                Serial.printf("Failed to send ADD_PEER command: %d\n", res);
+                delay(50);
+            }
+        }
     }
     
     snprintf(g_qrPayload, sizeof(g_qrPayload), 
@@ -501,6 +524,15 @@ static void updateTPMSStatusLabel_cb(void* arg) {
     if (ui_settingsCentralLabel) {
         lv_label_set_text(ui_settingsCentralLabel, g_tpmsPairingStatus);
     }
+    if (ui_batteryCentralLabel) {
+        lv_label_set_text(ui_batteryCentralLabel, g_tpmsPairingStatus);
+    }
+    if (ui_tempCentralLabel) {
+        lv_label_set_text(ui_tempCentralLabel, g_tpmsPairingStatus);
+    }
+    if (ui_tpmsCentralLabel) {
+        lv_label_set_text(ui_tpmsCentralLabel, g_tpmsPairingStatus);
+    }
     
     // If pairing complete or cancelled, update UI
     if (!g_tpmsPairingActive) {
@@ -561,8 +593,8 @@ void updateTPMSUI(void* arg) {
     (void)arg;
 
     // Unhide UI on first data packet
-    if (!g_tpmsDataReceived) {
-        g_tpmsDataReceived = true;
+    // Unhide UI on data packet (Idempotent)
+    if (g_tpmsDataReceived) {
         setTPMSUIState(true);
     }
 
@@ -609,6 +641,12 @@ void updateTPMSUI(void* arg) {
         if (!s || !s->configured || s->lastUpdate == 0) {
             lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0); // Default White
             return String("~");
+        }
+        
+        // Waiting for Data (Yellow 0s)
+        if (s->pressurePsi < 0.0f) {
+             lv_obj_set_style_text_color(label, lv_color_hex(0xFFFF00), 0); // Yellow
+             return String("0");
         }
         
         bool alert = false;
@@ -725,11 +763,7 @@ void tpmsDataCallback(TPMSPosition position, const TPMSSensor* sensor) {
     extern void triggerTPMSMeshIndicator(bool active);
     triggerTPMSMeshIndicator(true);
     
-    // Auto-switch to TPMS Screen on data update (User Request)
-    if (screen_index != 3) {
-        screen_index = 3;
-        screen_change_requested = true;
-    }
+    // Auto-switch removed in favor of centralized updateAutoRotation()
 }
 
 // Start TPMS Pairing - call this from Settings UI
@@ -922,6 +956,9 @@ void triggerGlobalAlert() {
 
 extern "C" void toggleRememberScreen() {
     g_rememberScreen = !g_rememberScreen;
+    if (g_rememberScreen) {
+        g_isAutoRotating = false; // Stop rotation if locked
+    }
     
     // Visual Feedback
     if (g_rememberScreen) {
@@ -1160,12 +1197,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
   bool allowSwitch = !settingsState && !g_rememberScreen;
   bool dwellPassed = (millis() - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS);
 
-  if (allowSwitch && dwellPassed && screen_index != 1) {
-      screen_index = 1;
-      screen_change_requested = true;
-      bezel_right = true; // Animate forward
-      g_lastScreenSwitchTime = millis(); // Reset dwell timer
-  }
+  // Auto-switch removed in favor of centralized updateAutoRotation()
 
   // 3. Pairing Success Feedback (Visual)
   // If we are in Settings Mode (Pairing) and receive valid data, change "Back" to "Done".
@@ -1214,7 +1246,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
     "Last Hour      : %.2f Wh\n"
     "Last Day       : %.2f Wh\n"
     "Last Week      : %.2f Wh\n"
-    "Relayed Temp   : %.1f C (Age: %u ms)\n"
+    "Relayed Temp   : %.1f C (Age: %u ms, Interval: %u ms)\n"
     "===================\n",
     p->name[0] ? p->name : "AE Smart Shunt",
     p->messageID,
@@ -1230,7 +1262,8 @@ static void lv_update_shunt_ui_cb(void *user_data)
     p->lastDayWh,
     p->lastWeekWh,
     p->tempSensorTemperature,
-    p->tempSensorLastUpdate
+    p->tempSensorLastUpdate,
+    p->tempSensorUpdateInterval
   );
   Serial.print(logBuf);
   // Duplicate print removed
@@ -1371,12 +1404,7 @@ static void lv_update_temp_ui_cb(void *user_data)
     bool allowSwitch = !settingsState && !g_rememberScreen;
     bool dwellPassed = (millis() - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS);
 
-    if (allowSwitch && dwellPassed && screen_index != 2) {
-        screen_index = 2; // Temp Screen Index
-        screen_change_requested = true;
-        bezel_right = true;
-        g_lastScreenSwitchTime = millis();
-    }
+    // Auto-switch removed in favor of centralized updateAutoRotation()
 
     // Pairing Success Feedback (Visual)
     // If we are in Settings Mode (Pairing) and receive valid data, change "Back" to "Done".
@@ -1392,8 +1420,8 @@ static void lv_update_temp_ui_cb(void *user_data)
     uint32_t interval_ms = p->updateInterval;
     if (interval_ms == 0) interval_ms = 300000; // Default 5 mins if unknown
     
-    // Stale if Age > Interval + 60s Buffer
-    bool isStale = (age_ms > (interval_ms + 60000)); 
+    // Stale if Age > Interval + 30s Buffer (User Request)
+    bool isStale = (age_ms > (interval_ms + 30000));
     
     // Update Temperature Arc & Label
     lv_arc_set_value(ui_TempTempArc, (int)p->temperature);
@@ -1485,6 +1513,24 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Safe Copy (Limit to struct size)
     memcpy(&incomingReadings, incomingData, (len < sizeof(incomingReadings)) ? len : sizeof(incomingReadings));
 
+    // --- VERBOSE LOGGING ---
+    Serial.println("=== Gauge RX Shunt Data ===");
+    Serial.printf("Message ID     : %d\n", incomingReadings.messageID);
+    Serial.printf("Data Changed   : %s\n", incomingReadings.dataChanged ? "true" : "false");
+    Serial.printf("Voltage        : %.2f V\n", incomingReadings.batteryVoltage);
+    Serial.printf("Current        : %.2f A\n", incomingReadings.batteryCurrent);
+    Serial.printf("Power          : %.2f W\n", incomingReadings.batteryPower);
+    Serial.printf("SOC            : %.1f %%\n", incomingReadings.batterySOC);
+    Serial.printf("Capacity       : %.2f Ah\n", incomingReadings.batteryCapacity);
+    Serial.printf("Starter Voltage: %.2f V\n", incomingReadings.starterBatteryVoltage);
+    Serial.printf("Error          : %d\n", incomingReadings.batteryState); 
+    Serial.printf("Run Flat Time  : %s\n", incomingReadings.runFlatTime);
+    Serial.printf("Last Hour      : %.2f Wh\n", incomingReadings.lastHourWh);
+    Serial.printf("Last Day       : %.2f Wh\n", incomingReadings.lastDayWh);
+    Serial.printf("Last Week      : %.2f Wh\n", incomingReadings.lastWeekWh);
+    Serial.printf("Relayed Temp   : %.1f C (Age: %u ms)\n", incomingReadings.tempSensorTemperature, incomingReadings.tempSensorLastUpdate);
+    Serial.println("===========================");
+
   // Protocol Separation Security Check:
   // If we are strictly paired, we MUST ignore "Discovery Beacons" (ID 33).
   // ID 33 is only for finding new devices (Scanning Mode).
@@ -1520,12 +1566,17 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Enable Screens
     enable_ui_batteryScreen = true;
     
-    // Check for valid TPMS data (non-zero timestamp)
+    // Check for valid TPMS data (non-sentinel and fresh)
     bool hasTPMS = false;
     for(int i=0; i<4; i++) {
-        if(tmp.tpmsLastUpdate[i] > 0) hasTPMS = true;
+        // Shunt reports age in ms. 0xFFFFFFFF means "Not Configured".
+        // We show the screen if ANY sensor is configured, regardless of staleness (Show Last Known).
+        if(tmp.tpmsLastUpdate[i] != 0xFFFFFFFF) {
+            hasTPMS = true;
+        }
     }
     enable_ui_tpmsScreen = hasTPMS;
+    if (hasTPMS) g_tpmsDataReceived = true; // Use this to unhide the screen if data is fresh
 
     // Extract TPMS Data from Shunt
     for(int i=0; i<4; i++) {
@@ -1535,13 +1586,18 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
              tmp.tpmsVoltage[i], 
              tmp.tpmsLastUpdate[i]
          );
+         if (tmp.tpmsLastUpdate[i] > 0 && tmp.tpmsLastUpdate[i] != 0xFFFFFFFF) {
+             g_lastTPMSRxTime = millis();
+         }
     }
 
     // Checking Relayed Temp Sensor Data 
     // Age of 0xFFFFFFFF means "Never updated" or "Sentinel". 
-    // We only enable the screen if we have a valid non-sentinel age AND it's fresh enough (< 180s).
-    bool hasValidTemp = (tmp.tempSensorLastUpdate > 0 && tmp.tempSensorLastUpdate != 0xFFFFFFFF && tmp.tempSensorLastUpdate < 180000);
-    Serial.printf("[DEBUG] Temp Update: Age=%u, Valid=%d\n", tmp.tempSensorLastUpdate, hasValidTemp);
+    // Data is valid if it is NOT sentinel AND Age < (Interval + 30s buffer).
+    uint32_t tempTimeout = (tmp.tempSensorUpdateInterval > 0) ? (tmp.tempSensorUpdateInterval + 30000) : 180000;
+    
+    bool hasValidTemp = (tmp.tempSensorLastUpdate > 0 && tmp.tempSensorLastUpdate != 0xFFFFFFFF && tmp.tempSensorLastUpdate < tempTimeout);
+    Serial.printf("[DEBUG] Temp Update: Age=%u, Interval=%u, Valid=%d\n", tmp.tempSensorLastUpdate, tmp.tempSensorUpdateInterval, hasValidTemp);
     
     enable_ui_temperatureScreen = hasValidTemp;
     g_hasTempData = hasValidTemp;
@@ -1555,6 +1611,12 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
         
         relayed.id = 22;
         relayed.temperature = tmp.tempSensorTemperature;
+        
+        // Use Name from Shunt if available
+        if (tmp.tempSensorName[0] != '\0') {
+           strncpy(relayed.name, tmp.tempSensorName, sizeof(relayed.name)-1);
+           relayed.name[sizeof(relayed.name)-1] = '\0';
+        }
         relayed.batteryLevel = tmp.tempSensorBatteryLevel;
         relayed.updateInterval = tmp.tempSensorUpdateInterval; // Actual Interval
         relayed.batteryVoltage = (float)tmp.tempSensorLastUpdate; // Store AGE in unused float field
@@ -1562,11 +1624,23 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
         // Update Global State
         memcpy(&g_lastTempData, &relayed, sizeof(relayed));
 
+        // Check if relayed data is fresh
+        if (tmp.tempSensorLastUpdate != 0xFFFFFFFF && tmp.tempSensorLastUpdate < 180000) {
+            g_lastTempRxTime = millis();
+        }
+
         // Trigger UI Update
         struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
         if (tData) {
             memcpy(tData, &relayed, sizeof(struct_message_ae_temp_sensor));
-            lv_async_call(lv_update_temp_ui_cb, tData);
+            
+            // Queue for UI Task
+            UIQueueEvent evt;
+            evt.type = 2; // Temp (Relayed)
+            evt.data = tData;
+            if (xQueueSend(g_uiQueue, &evt, 0) != pdTRUE) {
+                free(tData); // Queue full, drop packet
+            }
         }
     }
 
@@ -1591,8 +1665,18 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     }
     memcpy(p, &tmp, sizeof(*p));
 
+    // Update Shunt RX Time
+    g_lastShuntRxTime = millis();
+
     // Schedule LVGL-safe update (runs in LVGL thread)
-    lv_async_call(lv_update_shunt_ui_cb, (void *)p);
+    // Schedule UI update via Queue (Safe)
+    UIQueueEvent evt;
+    evt.type = 1; // Shunt
+    evt.data = p;
+    if (xQueueSend(g_uiQueue, &evt, 0) != pdTRUE) {
+         Serial.println("UI Queue Full - Dropping Shunt Packet");
+         free(p);
+    }
   }
   break;
   
@@ -1651,13 +1735,20 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
        }
             memcpy(&g_lastTempData, &tmp, sizeof(tmp));
         g_hasTempData = true;
+        g_lastTempRxTime = millis();
         
         // Allocate heap memory for LVGL async call
         struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
         if (tData)
         {
           memcpy(tData, &tmp, sizeof(struct_message_ae_temp_sensor));
-          lv_async_call(lv_update_temp_ui_cb, tData);
+          
+          UIQueueEvent evt;
+          evt.type = 2; // Temp (Direct)
+          evt.data = tData;
+          if (xQueueSend(g_uiQueue, &evt, 0) != pdTRUE) {
+              free(tData);
+          }
         }
       break;
   }
@@ -1906,6 +1997,20 @@ void Task_TFT(void *pvParameters)
   {
     lv_timer_handler();
     
+    // Process UI Updates from Queue
+    UIQueueEvent evt;
+    while (xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
+        if (evt.type == 1) { // Shunt
+            lv_update_shunt_ui_cb(evt.data);
+        } else if (evt.type == 2) { // Temp
+            lv_update_temp_ui_cb(evt.data);
+        } else {
+             // Unknown type, just free data if not null? 
+             // Should not happen.
+             if(evt.data) free(evt.data);
+        }
+    }
+    
     // Auto-Refresh TPMS UI if in Auto Mode
     if (screen_index == 3 && tpmsHandler.displayMode == DISPLAY_AUTO) {
         static unsigned long lastTPMSRefresh = 0;
@@ -2036,14 +2141,7 @@ void Task_main(void *pvParameters)
     }
     
     
-    // Auto-Switch to Battery Screen when Data Arrives (Only if Auto-Switch is ENABLED)
-    if (!g_rememberScreen && !dataAutoSwitched && screen_index <= 0 && enable_ui_batteryScreen) {
-        screen_index = 1; // Battery Screen
-        bezel_right = true; // Animate Right
-        screen_change_requested = true;
-        dataAutoSwitched = true;
-        Serial.println("Auto-Switching to Battery Screen (Data Received)");
-    }
+    // updateAutoRotation() will handle this
     
     /* REMOVED: Old Debug Timer that forced Screen 0
     if (!timerRunning) { startTime = millis(); timerRunning = true; }
@@ -2123,9 +2221,8 @@ void Task_main(void *pvParameters)
       // Only switch if we found a valid new screen
       if (enabled && next != screen_index) {
           screen_index = next;
-          Serial.printf("Encoder %s %d\n", (action == ENC_CW) ? "CW" : "CCW", screen_index);
-          
-          // Manual selection recorded, no need to auto-switch back during this session
+          g_isAutoRotating = false; // Manual override: stop auto-rotation
+          Serial.printf("Encoder %s %d (Auto-Rotation: OFF)\n", (action == ENC_CW) ? "CW" : "CCW", screen_index);
           
           bezel_right = (action == ENC_CW);
           bezel_left = (action == ENC_CCW);
@@ -2205,9 +2302,71 @@ void Task_main(void *pvParameters)
       loopCounter = 0;
     }
 
+    // Centralized Timed Rotation Logic
+    unsigned long now = millis();
+    if (!settingsState && !g_rememberScreen && !g_qrActive && !g_resetPending) {
+        // Condition to START auto-rotation: User is on Home Page and Dwell has passed
+        if (screen_index == 0) {
+            if (now - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS) {
+                // Check for fresh data to start the cycle
+                bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
+                bool tempFresh = g_hasTempData && (now - g_lastTempRxTime < 30000);
+                bool tpmsFresh = enable_ui_tpmsScreen;
+
+                if (shuntFresh || tempFresh || tpmsFresh) {
+                    g_isAutoRotating = true;
+                    // Move to the first available fresh screen
+                    if (shuntFresh) screen_index = 1;
+                    else if (tempFresh) screen_index = 2;
+                    else screen_index = 3;
+                    
+                    screen_change_requested = true;
+                    bezel_right = true;
+                    g_lastRotationTime = now;
+                    g_lastScreenSwitchTime = now;
+                    Serial.printf("Home Dwell Expired: Starting Auto-Rotation at Screen %d\n", screen_index);
+                }
+            }
+        } else if (g_isAutoRotating) {
+            // Continual Rotation between Screens 1, 2, and 3
+            if (now - g_lastRotationTime > ROTATION_INTERVAL_MS) {
+                // Determine eligible screens
+                bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
+                bool tempFresh = g_hasTempData && (now - g_lastTempRxTime < 30000);
+                bool tpmsFresh = enable_ui_tpmsScreen;
+
+                // Pick next screen in order (1 -> 2 -> 3 -> 1)
+                int next = screen_index;
+                int count = 0;
+                do {
+                    next++;
+                    if (next > 3) next = 1; // Rotation cycle stays in 1-2-3 loop
+                    
+                    bool eligible = false;
+                    if (next == 1) eligible = shuntFresh;
+                    if (next == 2) eligible = tempFresh;
+                    if (next == 3) eligible = tpmsFresh;
+                    
+                    if (eligible && next != screen_index) {
+                        screen_index = next;
+                        screen_change_requested = true;
+                        bezel_right = true;
+                        g_lastRotationTime = now;
+                        Serial.printf("Auto-Rotate: Next Screen %d\n", screen_index);
+                        break;
+                    }
+                    count++;
+                } while (count < 3);
+                
+                if (count >= 3) {
+                    // No other eligible fresh screen found, resume later
+                    g_lastRotationTime = now; 
+                }
+            }
+        }
+    }
+
     // TPMS BLE scanning
-    // TPMS BLE scanning
-    // Serial.println("L2"); // Pre-TPMS
     tpmsHandler.update();
     // Serial.println("L3"); // Post-TPMS
 
@@ -2350,6 +2509,10 @@ void setup()
 
   // Init Display
   gfx->begin();
+
+  // Create UI Queue
+  g_uiQueue = xQueueCreate(20, sizeof(UIQueueEvent));
+  if (!g_uiQueue) Serial.println("FAILED TO CREATE UI QUEUE!");
 
   lv_init();
 

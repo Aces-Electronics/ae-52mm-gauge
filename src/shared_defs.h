@@ -83,6 +83,7 @@ typedef struct struct_message_ae_smart_shunt_1 {
   uint8_t tempSensorBatteryLevel;
   uint32_t tempSensorUpdateInterval; // Added for Staleness Logic
   uint32_t tempSensorLastUpdate;
+  char tempSensorName[24]; // ADDED: Relayed Device Name
 } __attribute__((packed)) struct_message_ae_smart_shunt_1;
 
 typedef struct struct_message_tpms_config {

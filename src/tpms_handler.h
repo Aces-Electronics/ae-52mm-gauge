@@ -129,6 +129,7 @@ private:
     bool scanActive;
     unsigned long lastScanTime;
     unsigned long scanStartTime;  // Track when scan started for timeout
+    uint32_t lastPairingSuccessTime = 0; // For auto-advance
     
     // Callbacks
     TPMSPairingCallback pairingCallback;
