@@ -8,3 +8,4 @@ src/passwords.h
 ui/autosave/
 ui/backup/releases/
 src/passwords.cpp
+releases/
