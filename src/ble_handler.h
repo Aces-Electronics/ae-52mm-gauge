@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
-#include <NimBLEadvertisedDevice.h>
+#include <NimBLEAdvertisedDevice.h>
 #include <aes/esp_aes.h>
 #include "NimBLEBeacon.h"
 #include "shared_defs.h" // use the same definitions as the shunt

@@ -6,4 +6,5 @@
 .DS_Store
 src/passwords.h
 ui/autosave/
-ui/backup/
+ui/backup/releases/
+src/passwords.cpp
