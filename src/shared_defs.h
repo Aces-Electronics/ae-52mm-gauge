@@ -89,7 +89,7 @@ typedef struct struct_message_ae_smart_shunt_1 {
   uint8_t tempSensorBatteryLevel;
   uint32_t tempSensorUpdateInterval; // Added for Staleness Logic
   uint32_t tempSensorLastUpdate;
-  char tempSensorName[24]; // ADDED: Relayed Device Name
+  char tempSensorName[32]; // ADDED: Relayed Device Name
   uint8_t tempSensorHardwareVersion;
   char tempSensorFirmwareVersion[12];
   
@@ -110,7 +110,7 @@ typedef struct struct_message_temp_sensor {
   float batteryVoltage;
   uint8_t batteryLevel;
   uint32_t updateInterval;
-  char name[16];
+  char name[32];
   uint8_t hardwareVersion;
   char firmwareVersion[12];
 } __attribute__((packed)) struct_message_temp_sensor;
