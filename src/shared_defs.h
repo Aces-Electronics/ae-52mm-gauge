@@ -76,7 +76,7 @@ typedef struct struct_message_ae_smart_shunt_1 {
   float lastHourWh;
   float lastDayWh;
   float lastWeekWh;
-  char name[24];   // Device name (e.g., "AE Smart Shunt" or custom)
+  char name[32];   // Device name (e.g., "AE Smart Shunt" or custom)
   
   // TPMS Data (Offloaded)
   float tpmsPressurePsi[4];
