@@ -276,10 +276,10 @@ void BLEHandler::onResult(BLEAdvertisedDevice *advertisedDevice)
             strcpy(savedDeviceName, advertisedDevice->getName().c_str());
         }
 
-        if (vicData->encryptKeyMatch != key[0])
+        if (vicData->encryptKeyMatch != victronKey[0])
         {
             Serial.printf("Packet encryption key byte 0x%2.2x doesn't match configured key[0] byte 0x%2.2x\n",
-                          vicData->encryptKeyMatch, key[0]);
+                          vicData->encryptKeyMatch, victronKey[0]);
             return;
         }
 
@@ -297,7 +297,7 @@ void BLEHandler::onResult(BLEAdvertisedDevice *advertisedDevice)
         esp_aes_context ctx;
         esp_aes_init(&ctx);
 
-        auto status = esp_aes_setkey(&ctx, key, keyBits);
+        auto status = esp_aes_setkey(&ctx, victronKey, keyBits);
         if (status != 0)
         {
             Serial.printf("  Error during esp_aes_setkey operation (%i).\n", status);

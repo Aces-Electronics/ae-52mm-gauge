@@ -15,6 +15,9 @@ extern int screen_index;
 extern bool bezel_right;
 
 
+// Victron key (shared global)
+extern uint8_t victronKey[16];
+
 class BLEHandler : public BLEAdvertisedDeviceCallbacks {
 public:
     BLEHandler(struct_message_voltage0* voltageStruct);
@@ -25,13 +28,6 @@ public:
 private:
     char savedDeviceName[32];
     int keyBits = 128;
-
-    //Victron Battery Protect
-    // 472cba2ae7d2f1bf4c3948dd1986e48e
-    uint8_t key[16] = {
-        0x47, 0x2c, 0xba, 0x2a, 0xe7, 0xd2, 0xf1, 0xbf,
-        0x4c, 0x39, 0x48, 0xdd, 0x19, 0x86, 0xe4, 0x8e
-    };
 
     struct_message_voltage0* voltageStruct;
 

@@ -11,7 +11,13 @@
 
 #include "shared_defs.h" // use the same definitions as the shunt
 #include "touch.h"
-#include "passwords.h"
+#include "shared_defs.h"
+#include <aes/esp_aes.h>
+
+// Dynamic configuration (set via BLE/NVS)
+String SSID = "none";
+String PWD = "none";
+uint8_t victronKey[16] = {0};
 #include "ble_handler.h"
 #include "encoder.h"
 #include "pairing_handler.h"
@@ -2398,8 +2404,15 @@ void setup()
 
   preferences.begin("ae", false);
   wifiSetToOn = preferences.getBool("p_wifiOn");
-  SSID = preferences.getString("p_ssid", "no_p_ssid");
-  PWD = preferences.getString("p_pwd", "no_p_pwd");
+  SSID = preferences.getString("p_ssid", "none");
+  PWD = preferences.getString("p_pwd", "none");
+  String savedKey = preferences.getString("p_key", "");
+  if (savedKey.length() == 32) {
+      for (int i = 0; i < 16; i++) {
+          char buf[3] = {savedKey[i*2], savedKey[i*2+1], '\0'};
+          victronKey[i] = (uint8_t)strtoul(buf, NULL, 16);
+      }
+  }
 
   // Load Remember Screen
   g_rememberScreen = preferences.getBool("rem_scr", false);
