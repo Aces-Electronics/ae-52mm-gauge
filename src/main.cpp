@@ -497,7 +497,7 @@ extern "C" void startPairingProcess() {
     
     // 2. Enable Scanning Mode
     g_scanningMode = true;
-    if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
         connectedDevices.clear(); // Clear old list
         xSemaphoreGive(g_connectedDevicesMutex);
     }
@@ -1516,7 +1516,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // else: accept all (Discovery Mode / Legacy)
 
     // Update connected devices map
-    if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    if (xSemaphoreTake(g_connectedDevicesMutex, 0) == pdTRUE) {
         connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
         if (g_scanningMode) {
            Serial.printf("SCAN: Added/Updated Device List -> %s\n", macStr);
@@ -1646,7 +1646,11 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     evt.type = 1; // Shunt
     evt.data = p;
     if (xQueueSend(g_uiQueue, &evt, 0) != pdTRUE) {
-         Serial.println("UI Queue Full - Dropping Shunt Packet");
+         static unsigned long lastQueueFullPrint = 0;
+         if (millis() - lastQueueFullPrint > 1000) {
+             Serial.println("UI Queue Full - Dropping Shunt Packet (Throttled)");
+             lastQueueFullPrint = millis();
+         }
          free(p);
     }
   }
@@ -1663,7 +1667,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
        char macStr[18];
         snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
                  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        if (xSemaphoreTake(g_connectedDevicesMutex, 0) == pdTRUE) { // No wait in Radio Task
             connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
             xSemaphoreGive(g_connectedDevicesMutex);
         }
@@ -1703,7 +1707,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
       String displayName = String(tmp.name);
       if (displayName.length() == 0) displayName = "Temp Sensor";
       
-      if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+      if (xSemaphoreTake(g_connectedDevicesMutex, 0) == pdTRUE) { // No wait in Radio Task
           connectedDevices[String(macStr)] = {displayName, millis()};
           if (g_scanningMode) {
              Serial.printf("SCAN: Added/Updated Temp Sensor -> %s (%s)\n", macStr, displayName.c_str());
@@ -1976,14 +1980,14 @@ void Task_TFT(void *pvParameters)
     
     // Process UI Updates from Queue (Limit per loop to prevent watchdog trigger)
     UIQueueEvent evt;
-    if (xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
+    int processed = 0;
+    while (processed < 10 && xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
+        processed++;
         if (evt.type == 1) { // Shunt
             lv_update_shunt_ui_cb(evt.data);
         } else if (evt.type == 2) { // Temp
             lv_update_temp_ui_cb(evt.data);
         } else {
-             // Unknown type, just free data if not null? 
-             // Should not happen.
              if(evt.data) free(evt.data);
         }
     }
@@ -2553,10 +2557,9 @@ void setup()
 
   Serial.printf("BOOT: Free Heap End Setup: %d\n", ESP.getFreeHeap());
 
-  // Swapping task cores and increasing stack sizes to prevent watchdog trigger.
-  // UI Task (Task_TFT) moved to Core 1, Stack increased to 20KB.
-  // Main Logic (Task_main) moved to Core 0.
-  BaseType_t res1 = xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 3, NULL, 1);
+  // UI Task (Task_TFT) on Core 1, Main Logic on Core 0.
+  // Increase Task_TFT priority slightly to ensure UI responsiveness.
+  BaseType_t res1 = xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 4, NULL, 1);
   if (res1 != pdPASS) Serial.println("BOOT: Task_TFT creation FAILED!");
   else Serial.println("BOOT: Task_TFT created.");
 
