@@ -5,6 +5,8 @@
 #include <Preferences.h>
 #include <set>
 #include <string>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 // TPMS sensor positions (pairing order: FR → RR → RL → FL)
 enum TPMSPosition { 
@@ -144,6 +146,8 @@ private:
     static void onBLEAdvertisement(void* arg);
     void startScan(); // Private, only for pairing
     void stopScan();
+    
+    SemaphoreHandle_t mutex;
 };
 
 // Global instance

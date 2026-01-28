@@ -153,6 +153,7 @@ struct DeviceInfo {
     uint32_t lastSeen;
 };
 std::map<String, DeviceInfo> connectedDevices;
+SemaphoreHandle_t g_connectedDevicesMutex = NULL;
 
 // Cached data for Swing Arc
 float g_lastTemp = -999.0f; // invalid init
@@ -454,12 +455,15 @@ static void scan_refresh_timer_cb(lv_timer_t * timer) {
     lv_obj_clean(g_pairingList);
     lv_list_add_text(g_pairingList, "Select Device (Scanning...)");
     
-    for (auto const& pair : connectedDevices) {
-        String mac = pair.first;
-        DeviceInfo info = pair.second;
-        String label = info.type + " (" + mac + ")";
-        lv_obj_t * btn = lv_list_add_btn(g_pairingList, LV_SYMBOL_WIFI, label.c_str());
-        lv_obj_add_event_cb(btn, pairing_list_event_handler, LV_EVENT_CLICKED, NULL);
+    if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        for (auto const& pair : connectedDevices) {
+            String mac = pair.first;
+            DeviceInfo info = pair.second;
+            String label = info.type + " (" + mac + ")";
+            lv_obj_t * btn = lv_list_add_btn(g_pairingList, LV_SYMBOL_WIFI, label.c_str());
+            lv_obj_add_event_cb(btn, pairing_list_event_handler, LV_EVENT_CLICKED, NULL);
+        }
+        xSemaphoreGive(g_connectedDevicesMutex);
     }
     
     // Add close button at bottom
@@ -493,7 +497,10 @@ extern "C" void startPairingProcess() {
     
     // 2. Enable Scanning Mode
     g_scanningMode = true;
-    connectedDevices.clear(); // Clear old list
+    if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        connectedDevices.clear(); // Clear old list
+        xSemaphoreGive(g_connectedDevicesMutex);
+    }
     
     if (g_pairingList) {
         lv_obj_del(g_pairingList);
@@ -1235,43 +1242,8 @@ static void lv_update_shunt_ui_cb(void *user_data)
       // Serial.println("[DEBUG] Forced Hiding of Waiting Label");
   }
 
-  // Atomic Logging to prevent interleaving
-  char logBuf[1024]; // Increased buffer size
-  snprintf(logBuf, sizeof(logBuf), 
-    "\n=== Local Shunt ===\n"
-    "Name           : %s\n"
-    "Message ID     : %d\n"
-    "Voltage        : %.2f V\n"
-    "Current        : %.2f A\n"
-    "Power          : %.2f W\n"
-    "SOC            : %.1f %%\n"
-    "Capacity       : %.2f Ah\n"
-    "Starter Voltage: %.2f V\n"
-    "Error          : %d\n"
-    "Run Flat Time  : %s\n"
-    "Last Hour      : %.2f Wh\n"
-    "Last Day       : %.2f Wh\n"
-    "Last Week      : %.2f Wh\n"
-    "Relayed Temp   : %.1f C (Age: %u ms, Interval: %u ms)\n"
-    "===================\n",
-    p->name[0] ? p->name : "AE Smart Shunt",
-    p->messageID,
-    p->batteryVoltage,
-    p->batteryCurrent,
-    p->batteryPower,
-    p->batterySOC * 100.0f,
-    p->batteryCapacity,
-    p->starterBatteryVoltage,
-    p->batteryState,
-    p->runFlatTime,
-    p->lastHourWh,
-    p->lastDayWh,
-    p->lastWeekWh,
-    p->tempSensorTemperature,
-    p->tempSensorLastUpdate,
-    p->tempSensorUpdateInterval
-  );
-  Serial.print(logBuf);
+  // Atomic Logging removed to prevent Serial throughput bottlenecks causing Watchdog triggers
+  // ...
   // Duplicate print removed
 
   // Change: Outer Arc now displays SOC (0-100%) instead of Voltage
@@ -1427,7 +1399,8 @@ static void lv_update_temp_ui_cb(void *user_data)
     if (interval_ms == 0) interval_ms = 300000; // Default 5 mins if unknown
     
     // Stale if Age > Interval + 30s Buffer (User Request)
-    bool isStale = (age_ms > (interval_ms + 30000));
+    // Handle Sentinel Age (0xFFFFFFFF)
+    bool isStale = (age_ms == 0xFFFFFFFF) || (age_ms > (interval_ms + 30000));
     
     // Update Temperature Arc & Label
     lv_arc_set_value(ui_TempTempArc, (int)p->temperature);
@@ -1519,23 +1492,9 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Safe Copy (Limit to struct size)
     memcpy(&incomingReadings, incomingData, (len < sizeof(incomingReadings)) ? len : sizeof(incomingReadings));
 
-    // --- VERBOSE LOGGING ---
-    Serial.println("=== Gauge RX Shunt Data ===");
-    Serial.printf("Message ID     : %d\n", incomingReadings.messageID);
-    Serial.printf("Data Changed   : %s\n", incomingReadings.dataChanged ? "true" : "false");
-    Serial.printf("Voltage        : %.2f V\n", incomingReadings.batteryVoltage);
-    Serial.printf("Current        : %.2f A\n", incomingReadings.batteryCurrent);
-    Serial.printf("Power          : %.2f W\n", incomingReadings.batteryPower);
-    Serial.printf("SOC            : %.1f %%\n", incomingReadings.batterySOC);
-    Serial.printf("Capacity       : %.2f Ah\n", incomingReadings.batteryCapacity);
-    Serial.printf("Starter Voltage: %.2f V\n", incomingReadings.starterBatteryVoltage);
-    Serial.printf("Error          : %d\n", incomingReadings.batteryState); 
-    Serial.printf("Run Flat Time  : %s\n", incomingReadings.runFlatTime);
-    Serial.printf("Last Hour      : %.2f Wh\n", incomingReadings.lastHourWh);
-    Serial.printf("Last Day       : %.2f Wh\n", incomingReadings.lastDayWh);
-    Serial.printf("Last Week      : %.2f Wh\n", incomingReadings.lastWeekWh);
-    Serial.printf("Relayed Temp   : %.1f C (Age: %u ms)\n", incomingReadings.tempSensorTemperature, incomingReadings.tempSensorLastUpdate);
-    Serial.println("===========================");
+    // --- VERBOSE LOGGING REMOVED ---
+    // Serial.println("=== Gauge RX Shunt Data ===");
+    // ...
 
   // Protocol Separation Security Check:
   // If we are strictly paired, we MUST ignore "Discovery Beacons" (ID 33).
@@ -1557,9 +1516,12 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // else: accept all (Discovery Mode / Legacy)
 
     // Update connected devices map
-    connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
-    if (g_scanningMode) {
-       Serial.printf("SCAN: Added/Updated Device List -> %s\n", macStr);
+    if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
+        if (g_scanningMode) {
+           Serial.printf("SCAN: Added/Updated Device List -> %s\n", macStr);
+        }
+        xSemaphoreGive(g_connectedDevicesMutex);
     }
 
     // Defensive copy: zero target and copy up to struct size
@@ -1603,7 +1565,11 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     uint32_t tempTimeout = (tmp.tempSensorUpdateInterval > 0) ? (tmp.tempSensorUpdateInterval + 30000) : 180000;
     
     bool hasValidTemp = (tmp.tempSensorLastUpdate > 0 && tmp.tempSensorLastUpdate != 0xFFFFFFFF && tmp.tempSensorLastUpdate < tempTimeout);
-    Serial.printf("[DEBUG] Temp Update: Age=%u, Interval=%u, Valid=%d\n", tmp.tempSensorLastUpdate, tmp.tempSensorUpdateInterval, hasValidTemp);
+    if (tmp.tempSensorLastUpdate == 0xFFFFFFFF) {
+        Serial.printf("[DEBUG] Temp Update: Age=N/A (Sentinel), Interval=%u, Valid=%d\n", tmp.tempSensorUpdateInterval, hasValidTemp);
+    } else {
+        Serial.printf("[DEBUG] Temp Update: Age=%u, Interval=%u, Valid=%d\n", tmp.tempSensorLastUpdate, tmp.tempSensorUpdateInterval, hasValidTemp);
+    }
     
     enable_ui_temperatureScreen = hasValidTemp;
     g_hasTempData = hasValidTemp;
@@ -1697,7 +1663,10 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
        char macStr[18];
         snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
                  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
+        if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
+            xSemaphoreGive(g_connectedDevicesMutex);
+        }
        // Serial.println("Received Beacon (ID 33) - List Updated");
       break;
   }
@@ -1734,11 +1703,13 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
       String displayName = String(tmp.name);
       if (displayName.length() == 0) displayName = "Temp Sensor";
       
-      connectedDevices[String(macStr)] = {displayName, millis()};
-      
-      if (g_scanningMode) {
-         Serial.printf("SCAN: Added/Updated Temp Sensor -> %s (%s)\n", macStr, displayName.c_str());
-       }
+      if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+          connectedDevices[String(macStr)] = {displayName, millis()};
+          if (g_scanningMode) {
+             Serial.printf("SCAN: Added/Updated Temp Sensor -> %s (%s)\n", macStr, displayName.c_str());
+          }
+          xSemaphoreGive(g_connectedDevicesMutex);
+      }
             memcpy(&g_lastTempData, &tmp, sizeof(tmp));
         g_hasTempData = true;
         g_lastTempRxTime = millis();
@@ -2003,9 +1974,9 @@ void Task_TFT(void *pvParameters)
   {
     lv_timer_handler();
     
-    // Process UI Updates from Queue
+    // Process UI Updates from Queue (Limit per loop to prevent watchdog trigger)
     UIQueueEvent evt;
-    while (xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
+    if (xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
         if (evt.type == 1) { // Shunt
             lv_update_shunt_ui_cb(evt.data);
         } else if (evt.type == 2) { // Temp
@@ -2056,8 +2027,12 @@ void Task_TFT(void *pvParameters)
       screen_change_requested = false;
 
       // Example logic for screen_index based on screen_index
-      // Logic for screen_index clamping and Landing Page scrolling
-      int min_index = -(int)connectedDevices.size();
+      int devCount = 0;
+      if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+          devCount = connectedDevices.size();
+          xSemaphoreGive(g_connectedDevicesMutex);
+      }
+      int min_index = -devCount;
       // Update max index to 3 (TPMS Screen)
       if (screen_index > 3)
         screen_index = 3;
@@ -2070,8 +2045,13 @@ void Task_TFT(void *pvParameters)
       
       // Update label if on Landing Page (0)
       if (screen_index == 0 && !g_qrActive) {
+          int dCount = 0;
+          if (xSemaphoreTake(g_connectedDevicesMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+              dCount = connectedDevices.size();
+              xSemaphoreGive(g_connectedDevicesMutex);
+          }
           lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
-          lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE Network: %d Device(s) Found", connectedDevices.size());
+          lv_label_set_text_fmt(ui_aeLandingBottomLabel, "AE Network: %d Device(s) Found", dCount);
       }
 
       // Serial.printf("Screen change case: %d\n", screen_index);
@@ -2527,6 +2507,9 @@ void setup()
   g_uiQueue = xQueueCreate(20, sizeof(UIQueueEvent));
   if (!g_uiQueue) Serial.println("FAILED TO CREATE UI QUEUE!");
 
+  g_connectedDevicesMutex = xSemaphoreCreateMutex();
+  if (!g_connectedDevicesMutex) Serial.println("FAILED TO CREATE MUTEX!");
+
   lv_init();
 
   lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * screenHeight / 5);
@@ -2570,13 +2553,14 @@ void setup()
 
   Serial.printf("BOOT: Free Heap End Setup: %d\n", ESP.getFreeHeap());
 
-  // Reduce stack sizes to fit in memory (40k -> 10k, 20k -> 10k)
-  // Check return values
-  BaseType_t res1 = xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 10240, NULL, 3, NULL, 0);
+  // Swapping task cores and increasing stack sizes to prevent watchdog trigger.
+  // UI Task (Task_TFT) moved to Core 1, Stack increased to 20KB.
+  // Main Logic (Task_main) moved to Core 0.
+  BaseType_t res1 = xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 3, NULL, 1);
   if (res1 != pdPASS) Serial.println("BOOT: Task_TFT creation FAILED!");
   else Serial.println("BOOT: Task_TFT created.");
 
-  BaseType_t res2 = xTaskCreatePinnedToCore(Task_main, "Task_main", 10240, NULL, 3, NULL, 1);
+  BaseType_t res2 = xTaskCreatePinnedToCore(Task_main, "Task_main", 10240, NULL, 3, NULL, 0);
   if (res2 != pdPASS) Serial.println("BOOT: Task_main creation FAILED!");
   else Serial.println("BOOT: Task_main created.");
 }

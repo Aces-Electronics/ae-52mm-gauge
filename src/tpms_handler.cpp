@@ -73,6 +73,7 @@ TPMSHandler::TPMSHandler()
     , dataCallback(nullptr)
 {
     g_tpmsHandler = this;
+    mutex = xSemaphoreCreateMutex();
 }
 
 TPMSHandler::~TPMSHandler() {
@@ -241,25 +242,21 @@ void TPMSHandler::onSensorDiscovered(const uint8_t* mac, float voltage, int temp
         
         if (pressure >= PRESSURE_THRESHOLD_PSI) {
             Serial.printf("[TPMS] Found %s: %s (%.1f PSI)\n", TPMS_POSITION_SHORT[currentPairingPosition], macStr.c_str(), pressure);
-            memcpy(sensors[currentPairingPosition].mac, mac, 6);
-            sensors[currentPairingPosition].configured = true;
-            sensors[currentPairingPosition].batteryVoltage = voltage;
-            sensors[currentPairingPosition].temperature = temp;
-            sensors[currentPairingPosition].pressurePsi = pressure;
-            sensors[currentPairingPosition].lastUpdate = millis();
+            
+            if (xSemaphoreTake(mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                memcpy(sensors[currentPairingPosition].mac, mac, 6);
+                sensors[currentPairingPosition].configured = true;
+                sensors[currentPairingPosition].batteryVoltage = voltage;
+                sensors[currentPairingPosition].temperature = temp;
+                sensors[currentPairingPosition].pressurePsi = pressure;
+                sensors[currentPairingPosition].lastUpdate = millis();
+                xSemaphoreGive(mutex);
+            }
             
             pairedMacsThisSession.insert(macStr.c_str());
             pairingState = PAIRING_FOUND;
             lastPairingSuccessTime = millis();
             if (pairingCallback) pairingCallback(currentPairingPosition, PAIRING_FOUND, pressure);
-            
-            // Advance automatically after 2s
-            // Handled by UI delay usually, or we can just wait for user tap
-            // Assuming User Tap or Auto.
-            // For now, we stay in FOUND state until UI interaction?
-            // Existing logic relied on clicking next? Or auto?
-            // Original code: Advance logic was UI driven?
-            // Actually, Original Code didn't auto advance usually. But let's assume UI handles "Next".
         }
     }
 }
@@ -270,19 +267,22 @@ void TPMSHandler::updateSensorData(int pos, float pressure, int temp, float volt
     // Check staleness via shuntTs change
     // If shuntTs is different from lastShuntTimestamp, it's a new packet
     if (shuntTs != sensors[pos].lastShuntTimestamp) {
-        sensors[pos].lastShuntTimestamp = shuntTs;
-        
-        if (shuntTs == 0xFFFFFFFE) {
-            // Configured but Waiting for Data
-            sensors[pos].pressurePsi = -1.0f;
-            sensors[pos].batteryVoltage = 0.0f;
-            sensors[pos].temperature = 0;
-        } else {
-            sensors[pos].pressurePsi = pressure;
-            sensors[pos].temperature = temp;
-            sensors[pos].batteryVoltage = volt;
+        if (xSemaphoreTake(mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            sensors[pos].lastShuntTimestamp = shuntTs;
+            
+            if (shuntTs == 0xFFFFFFFE) {
+                // Configured but Waiting for Data
+                sensors[pos].pressurePsi = -1.0f;
+                sensors[pos].batteryVoltage = 0.0f;
+                sensors[pos].temperature = 0;
+            } else {
+                sensors[pos].pressurePsi = pressure;
+                sensors[pos].temperature = temp;
+                sensors[pos].batteryVoltage = volt;
+            }
+            sensors[pos].lastUpdate = millis(); // Fresh update at Gauge time
+            xSemaphoreGive(mutex);
         }
-        sensors[pos].lastUpdate = millis(); // Fresh update at Gauge time
         
         // Notify Data Callback
         if (dataCallback && sensors[pos].configured) {
