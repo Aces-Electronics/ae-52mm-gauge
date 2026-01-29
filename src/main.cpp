@@ -1769,10 +1769,12 @@ void changeScreen(lv_obj_t *targetScreen, bool enabled, const char *screenName)
   if (bezel_left)
   {
     _ui_screen_change(&targetScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 500, 0, nullptr);
+    bezel_left = false; // Reset flag after use
   }
   else if (bezel_right)
   {
     _ui_screen_change(&targetScreen, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0, nullptr);
+    bezel_right = false; // Reset flag after use
   }
   else
   {
@@ -1981,7 +1983,7 @@ void Task_TFT(void *pvParameters)
     // Process UI Updates from Queue (Limit per loop to prevent watchdog trigger)
     UIQueueEvent evt;
     int processed = 0;
-    while (processed < 10 && xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
+    while (processed < 30 && xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
         processed++;
         if (evt.type == 1) { // Shunt
             lv_update_shunt_ui_cb(evt.data);
@@ -2102,7 +2104,7 @@ void Task_TFT(void *pvParameters)
 
       }
     }
-    vTaskDelay(10);
+    vTaskDelay(5);
   }
 }
 
@@ -2319,7 +2321,8 @@ void Task_main(void *pvParameters)
             }
         } else if (g_isAutoRotating) {
             // Continual Rotation between Screens 1, 2, and 3
-            if (now - g_lastRotationTime > ROTATION_INTERVAL_MS) {
+            // Cooldown: Only rotate if screen_change_requested is false (Task_TFT has acknowledged previous)
+            if (!screen_change_requested && (now - g_lastRotationTime > ROTATION_INTERVAL_MS)) {
                 // Determine eligible screens
                 bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
                 bool tempFresh = g_hasTempData && (now - g_lastTempRxTime < 30000);
@@ -2508,7 +2511,8 @@ void setup()
   gfx->begin();
 
   // Create UI Queue
-  g_uiQueue = xQueueCreate(20, sizeof(UIQueueEvent));
+  // Increased Queue depth to 100 to handle bursts during screen transitions.
+  g_uiQueue = xQueueCreate(100, sizeof(UIQueueEvent));
   if (!g_uiQueue) Serial.println("FAILED TO CREATE UI QUEUE!");
 
   g_connectedDevicesMutex = xSemaphoreCreateMutex();
