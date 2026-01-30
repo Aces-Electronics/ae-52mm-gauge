@@ -147,23 +147,49 @@ void toggle_error_view(bool show_error) {
     if (!ui_batteryScreen) return;
     
     if (show_error) {
-        // Hide Normal Elements
-        lv_obj_add_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_SBattVArc) lv_obj_add_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
+        if(ui_SA1Arc) lv_obj_add_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
+        if(ui_battVLabelSensor) lv_obj_add_flag(ui_battVLabelSensor, LV_OBJ_FLAG_HIDDEN);
+        if(ui_battALabelSensor) lv_obj_add_flag(ui_battALabelSensor, LV_OBJ_FLAG_HIDDEN);
+        if(ui_batteryVLabel) lv_obj_add_flag(ui_batteryVLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_batteryALabel) lv_obj_add_flag(ui_batteryALabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_startBatteryLabel) lv_obj_add_flag(ui_startBatteryLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeIconBatteryScreen1) lv_obj_add_flag(ui_aeIconBatteryScreen1, LV_OBJ_FLAG_HIDDEN);
+        if(ui_Image1) lv_obj_add_flag(ui_Image1, LV_OBJ_FLAG_HIDDEN);
+        if(ui_SOCLabel) lv_obj_add_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BarDayLabel) lv_obj_add_flag(ui_BarDayLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BarDayBottomLabel) lv_obj_add_flag(ui_BarDayBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BarWeekLabel) lv_obj_add_flag(ui_BarWeekLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BarWeekBottomLabel) lv_obj_add_flag(ui_BarWeekBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BatteryTime) lv_obj_add_flag(ui_BatteryTime, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeLandingBottomLabel) lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_feedbackLabel) lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeLandingIcon) lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
         
-        // Show Error
-        lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(ui_batteryCentralLabel, g_lastErrorStr);
-        lv_obj_set_style_text_color(ui_batteryCentralLabel, lv_color_hex(0xFF0000), 0);
+        if(ui_batteryCentralLabel) {
+            lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(ui_batteryCentralLabel, g_lastErrorStr);
+            lv_obj_set_style_text_color(ui_batteryCentralLabel, lv_color_hex(0xFF0000), 0);
+        }
     } else {
-        // Show Normal Elements
-        lv_obj_clear_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_SBattVArc) lv_obj_clear_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
+        if(ui_SA1Arc) lv_obj_clear_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
+        if(ui_battVLabelSensor) lv_obj_clear_flag(ui_battVLabelSensor, LV_OBJ_FLAG_HIDDEN);
+        if(ui_battALabelSensor) lv_obj_clear_flag(ui_battALabelSensor, LV_OBJ_FLAG_HIDDEN);
+        if(ui_batteryVLabel) lv_obj_clear_flag(ui_batteryVLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_batteryALabel) lv_obj_clear_flag(ui_batteryALabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_startBatteryLabel) lv_obj_clear_flag(ui_startBatteryLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeIconBatteryScreen1) lv_obj_clear_flag(ui_aeIconBatteryScreen1, LV_OBJ_FLAG_HIDDEN);
+        if(ui_Image1) lv_obj_clear_flag(ui_Image1, LV_OBJ_FLAG_HIDDEN);
+        if(ui_SOCLabel) lv_obj_clear_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BarDayLabel) lv_obj_clear_flag(ui_BarDayLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BarDayBottomLabel) lv_obj_clear_flag(ui_BarDayBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BarWeekLabel) lv_obj_clear_flag(ui_BarWeekLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BarWeekBottomLabel) lv_obj_clear_flag(ui_BarWeekBottomLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_BatteryTime) lv_obj_clear_flag(ui_BatteryTime, LV_OBJ_FLAG_HIDDEN);
+        if(ui_aeLandingBottomLabel) lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
         
-        // Hide Error
-        lv_obj_add_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+        if(ui_batteryCentralLabel) lv_obj_add_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
     }
 }
 struct_message_voltage0 localVoltage0Struct;
@@ -851,7 +877,7 @@ static const uint32_t MESH_TOGGLE_MS = 500;     // toggle every 500ms -> 1Hz bli
 static lv_timer_t *g_heartbeat_timer = NULL;
 static int g_heartbeat_step = 0;
 static const int HEARTBEAT_STEPS = 4;
-static const uint32_t HEARTBEAT_INTERVAL_MS = 200; // 200ms per phase
+static const uint32_t HEARTBEAT_INTERVAL_MS = 1000; // 1s per phase
 
 
 
@@ -1256,7 +1282,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
 // ...
   // Use the same UI updates you used in Task_TFT, running here in LVGL context.
   // Check if we should update the landing label (only if not scrolling through devices)
-  if (screen_index > 0 && !g_qrActive) {
+  if (screen_index > 0 && !g_qrActive && !g_heartbeat_timer) {
       lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
       lv_label_set_text_fmt(ui_aeLandingBottomLabel, "%s: %.2fV  %.2fA  %.2fW",
                             p->name[0] ? p->name : "AE Smart Shunt",
@@ -1268,7 +1294,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
   // FORCE HIDE 'Waiting' Label (Robustness against desync)
   // This ensures that even if flags were toggled incorrectly elsewhere,
   // receiving fresh data ALWAYS clears the waiting message.
-  if (ui_batteryCentralLabel && !lv_obj_has_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN)) {
+  if (ui_batteryCentralLabel && !lv_obj_has_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN) && !g_heartbeat_timer) {
       lv_obj_add_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
       // Serial.println("[DEBUG] Forced Hiding of Waiting Label");
   }
@@ -1400,15 +1426,15 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   if (battery_issue)
   {
-    // start heartbeat sequence (red/white/red/white)
-    g_heartbeat_step = 0;
-
-    if (g_heartbeat_timer)
-    {
-      lv_timer_del(g_heartbeat_timer);
-      g_heartbeat_timer = NULL;
+    // start heartbeat sequence if not already running
+    if (!g_heartbeat_timer) {
+       g_heartbeat_step = 0;
+       
+       // Update UI immediate (don't wait for timer tick)
+       heartbeat_timer_cb(NULL);
+       
+       g_heartbeat_timer = lv_timer_create(heartbeat_timer_cb, HEARTBEAT_INTERVAL_MS, NULL);
     }
-    g_heartbeat_timer = lv_timer_create(heartbeat_timer_cb, HEARTBEAT_INTERVAL_MS, NULL);
   }
 
   // Free the heap memory we allocated in the ESP-NOW callback
