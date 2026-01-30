@@ -876,7 +876,7 @@ static const uint32_t MESH_TOGGLE_MS = 500;     // toggle every 500ms -> 1Hz bli
 
 static lv_timer_t *g_heartbeat_timer = NULL;
 static int g_heartbeat_step = 0;
-static const int HEARTBEAT_STEPS = 4;
+static const int HEARTBEAT_STEPS = 3;
 static const uint32_t HEARTBEAT_INTERVAL_MS = 1000; // 1s per phase
 
 
@@ -981,22 +981,17 @@ static void heartbeat_timer_cb(lv_timer_t *timer)
   switch (g_heartbeat_step)
   {
   case 0:
-    // Red + Error Text
+    // Step 1: Gauge Elements Turn Red (Normal View)
     set_battery_elements_color(lv_color_hex(0xFF0000));
-    toggle_error_view(true);
-    break;
-  case 1:
-    // White + Normal Text
-    set_battery_elements_color(lv_color_hex(0xFFFFFF));
     toggle_error_view(false);
     break;
-  case 2:
-    // Red + Error Text
+  case 1:
+    // Step 2: Error Message Appears (Error View) + Keep Red
     set_battery_elements_color(lv_color_hex(0xFF0000));
     toggle_error_view(true);
     break;
-  case 3:
-    // Back to White and stop
+  case 2:
+    // Step 3: Gauge Elements Turn White (Normal View) & Stop
     set_battery_elements_color(lv_color_hex(0xFFFFFF));
     toggle_error_view(false);
     
