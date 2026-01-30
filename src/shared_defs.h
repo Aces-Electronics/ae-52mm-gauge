@@ -66,6 +66,7 @@ typedef struct struct_message_ae_smart_shunt_1 {
   bool dataChanged;
   float batteryVoltage;
   float batteryCurrent;
+  float batteryCurrentAvg;
   float batteryPower;
   float batterySOC;
   float batteryCapacity;

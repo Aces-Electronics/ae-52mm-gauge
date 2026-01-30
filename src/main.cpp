@@ -140,6 +140,32 @@ int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 
 // Shared shunt storage and task-synchronisation flag
 volatile bool shuntUiUpdatePending = false;          // set by ESP-NOW callback, cleared in LVGL task
+char g_lastErrorStr[32] = "Error";                   // Reused for displaying specific error messages
+
+// Helper to toggle between Normal View and Error View
+void toggle_error_view(bool show_error) {
+    if (!ui_batteryScreen) return;
+    
+    if (show_error) {
+        // Hide Normal Elements
+        lv_obj_add_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+        
+        // Show Error
+        lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(ui_batteryCentralLabel, g_lastErrorStr);
+        lv_obj_set_style_text_color(ui_batteryCentralLabel, lv_color_hex(0xFF0000), 0);
+    } else {
+        // Show Normal Elements
+        lv_obj_clear_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+        
+        // Hide Error
+        lv_obj_add_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+    }
+}
 struct_message_voltage0 localVoltage0Struct;
 
 BLEHandler bleHandler(&localVoltage0Struct);
@@ -929,20 +955,25 @@ static void heartbeat_timer_cb(lv_timer_t *timer)
   switch (g_heartbeat_step)
   {
   case 0:
-    // Red
+    // Red + Error Text
     set_battery_elements_color(lv_color_hex(0xFF0000));
+    toggle_error_view(true);
     break;
   case 1:
-    // White
+    // White + Normal Text
     set_battery_elements_color(lv_color_hex(0xFFFFFF));
+    toggle_error_view(false);
     break;
   case 2:
-    // Red
+    // Red + Error Text
     set_battery_elements_color(lv_color_hex(0xFF0000));
+    toggle_error_view(true);
     break;
   case 3:
     // Back to White and stop
     set_battery_elements_color(lv_color_hex(0xFFFFFF));
+    toggle_error_view(false);
+    
     if (g_heartbeat_timer)
     {
       lv_timer_del(g_heartbeat_timer);
@@ -1343,12 +1374,29 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   // --- Battery issue detection and heartbeat flash ---
   bool battery_issue = false;
-  if (p->batterySOC >= 0.0f && p->batterySOC < BATTERY_SOC_ALERT) battery_issue = true;
-  if (fabsf(p->batteryCurrent) > BATTERY_CURRENT_ALERT_A) battery_issue = true;
-  if (p->batteryVoltage < BATTERY_VOLTAGE_LOW || p->batteryVoltage > BATTERY_VOLTAGE_HIGH) battery_issue = true;
+  if (p->batterySOC >= 0.0f && p->batterySOC < BATTERY_SOC_ALERT) {
+      battery_issue = true;
+      snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "LOW SOC: %.0f%%", p->batterySOC * 100.0f);
+  }
+  if (fabsf(p->batteryCurrent) > BATTERY_CURRENT_ALERT_A) {
+      battery_issue = true;
+      snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "OVER CURRENT");
+  }
+  if (p->batteryVoltage < BATTERY_VOLTAGE_LOW) {
+      battery_issue = true;
+      snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "LOW VOLTAGE");
+  }
+  else if (p->batteryVoltage > BATTERY_VOLTAGE_HIGH) {
+      battery_issue = true;
+      snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "HIGH VOLTAGE");
+  }
   
   // New Error States (Load Off, E-Fuse, Over Current)
-  if (p->batteryState != 0) battery_issue = true;
+  if (p->batteryState != 0) {
+      battery_issue = true;
+      // Decode batteryState bitmask if possible, else generic
+       snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "PROTECTION ACTIVE");
+  }
 
   if (battery_issue)
   {
