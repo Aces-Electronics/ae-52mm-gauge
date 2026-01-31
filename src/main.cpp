@@ -1541,9 +1541,9 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Serial.println("Received AE-Smart-Shunt data (ID 11)");
     
     // Debug: Log Incoming MAC
-    // char macStr[18];
-    // snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
-    //          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    char macStr[18];
+    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     
     // if (g_scanningMode) {
     //     Serial.printf("SCAN: Recv ID 11 from %s\n", macStr);
@@ -1634,11 +1634,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     uint32_t tempTimeout = (tmp.tempSensorUpdateInterval > 0) ? (tmp.tempSensorUpdateInterval + 30000) : 180000;
     
     bool hasValidTemp = (tmp.tempSensorLastUpdate > 0 && tmp.tempSensorLastUpdate != 0xFFFFFFFF && tmp.tempSensorLastUpdate < tempTimeout);
-    if (tmp.tempSensorLastUpdate == 0xFFFFFFFF) {
-    // Serial.printf("[DEBUG] Temp Update: Age=N/A (Sentinel), Interval=%u, Valid=%d\n", tmp.tempSensorUpdateInterval, hasValidTemp);
-    // } else {
-    //    Serial.printf("[DEBUG] Temp Update: Age=%u, Interval=%u, Valid=%d\n", tmp.tempSensorLastUpdate, tmp.tempSensorUpdateInterval, hasValidTemp);
-    // }
+    // Logging removed to prevent stalling
     
     enable_ui_temperatureScreen = hasValidTemp;
     g_hasTempData = hasValidTemp;
