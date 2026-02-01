@@ -144,6 +144,7 @@ typedef struct struct_message_ota_trigger {
   char url[128];
   char version[12];
   char md5[33];
+  bool force; // New Flag
 } __attribute__((packed)) struct_message_ota_trigger;
 
 // Backward Compatibility

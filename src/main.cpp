@@ -2342,21 +2342,35 @@ void Task_main(void *pvParameters)
             OTA::init(client);
 
             OTA::UpdateObject obj;
-            obj.condition = OTA::NEW_DIFFERENT;
-            obj.tag_name = String(g_otaTrigger.version);
-            
             String url = String(g_otaTrigger.url);
-            if (url.startsWith("http")) {
-                int protoEnd = url.indexOf("://");
-                int pathStart = url.indexOf("/", protoEnd + 3);
-                if (pathStart > 0) {
-                    obj.redirect_server = url.substring(protoEnd + 3, pathStart);
-                    obj.firmware_asset_endpoint = url.substring(pathStart);
+
+            if (g_otaTrigger.force && url.length() == 0) {
+                 Serial.println("[OTA] Force Update with Empty URL. Checking Defaults...");
+                 obj = OTA::isUpdateAvailable();
+                 if (obj.condition != OTA::NO_UPDATE) {
+                     Serial.println("[OTA] Default Update Found. Forcing Install.");
+                     obj.condition = OTA::NEW_DIFFERENT;
+                 } else {
+                     Serial.println("[OTA] No Default Update Found to Force. Attempting Re-Install of Current if possible (Not fully implemented without manifest)");
+                     // Fallback: If we really want to force, we likely need the manifest. 
+                     // Assuming isUpdateAvailable() returns something useful for current version check?
+                 }
+            } else {
+                obj.condition = OTA::NEW_DIFFERENT;
+                obj.tag_name = String(g_otaTrigger.version);
+                
+                if (url.startsWith("http")) {
+                    int protoEnd = url.indexOf("://");
+                    int pathStart = url.indexOf("/", protoEnd + 3);
+                    if (pathStart > 0) {
+                        obj.redirect_server = url.substring(protoEnd + 3, pathStart);
+                        obj.firmware_asset_endpoint = url.substring(pathStart);
+                    } else {
+                        obj.firmware_asset_endpoint = url;
+                    }
                 } else {
                     obj.firmware_asset_endpoint = url;
                 }
-            } else {
-                obj.firmware_asset_endpoint = url;
             }
 
             Serial.printf("[OTA] Updating to %s from %s/%s\n", 
