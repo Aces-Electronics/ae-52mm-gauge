@@ -8,6 +8,9 @@
 #include <nvs_flash.h>
 #include <Preferences.h>
 #include <aes/esp_aes.h> // AES library for decrypting the Victron manufacturer data.
+#include <OTA-Hub.hpp>
+#include <ota-github-defaults.h>
+#include <ota-github-cacerts.h>
 
 #include "shared_defs.h" // use the same definitions as the shunt
 #include "touch.h"
@@ -141,6 +144,10 @@ int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 // Shared shunt storage and task-synchronisation flag
 volatile bool shuntUiUpdatePending = false;          // set by ESP-NOW callback, cleared in LVGL task
 char g_lastErrorStr[32] = "Error";                   // Reused for displaying specific error messages
+
+// Indirect OTA Globals
+volatile bool g_indirectOtaPending = false;
+struct_message_ota_trigger g_otaTrigger;
 
 // Helper to toggle between Normal View and Error View
 void toggle_error_view(bool show_error) {
@@ -1531,11 +1538,17 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 
   uint8_t type = incomingData[0];
 
-  // Serial.print("Case: ");
-  // Serial.println(type);
-
   switch (type)
   {
+  case 110: // Indirect OTA Trigger
+  {
+      if (len == sizeof(struct_message_ota_trigger)) {
+          memcpy((void*)&g_otaTrigger, incomingData, sizeof(g_otaTrigger));
+          g_indirectOtaPending = true;
+          Serial.println("[ESP-NOW] Received OTA Trigger!");
+      }
+      break;
+  }
   case 11: // message ID 11 - AE Smart Shunt (Encrypted / Authentic)
   {
     // Serial.println("Received AE-Smart-Shunt data (ID 11)");
@@ -2297,6 +2310,70 @@ void Task_main(void *pvParameters)
           // Do nothing visually
       }
       break;
+    }
+
+    if (g_indirectOtaPending) {
+        g_indirectOtaPending = false;
+        Serial.println("[OTA] Processing Indirect OTA Trigger...");
+        
+        // 1. Stop ESP-NOW for WiFi stability
+        esp_now_deinit();
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_STA);
+        
+        // 2. Connect to relayed WiFi
+        WiFi.begin(g_otaTrigger.ssid, g_otaTrigger.pass);
+        
+        int tries = 0;
+        while (WiFi.status() != WL_CONNECTED && tries < 30) {
+            vTaskDelay(500);
+            tries++;
+            Serial.print(".");
+        }
+        
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("\n[OTA] WiFi Connected. Syncing Time...");
+            configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+            vTaskDelay(2000); // Wait for NTP
+            
+            WiFiClientSecure client;
+            client.setCACert(OTAGH_CA_CERT);
+            OTA::init(client);
+
+            UpdateObject obj;
+            obj.condition = OTA::NEW_DIFFERENT;
+            obj.tag_name = String(g_otaTrigger.version);
+            
+            String url = String(g_otaTrigger.url);
+            if (url.startsWith("http")) {
+                int protoEnd = url.indexOf("://");
+                int pathStart = url.indexOf("/", protoEnd + 3);
+                if (pathStart > 0) {
+                    obj.redirect_server = url.substring(protoEnd + 3, pathStart);
+                    obj.firmware_asset_endpoint = url.substring(pathStart);
+                } else {
+                    obj.firmware_asset_endpoint = url;
+                }
+            } else {
+                obj.firmware_asset_endpoint = url;
+            }
+
+            Serial.printf("[OTA] Updating to %s from %s/%s\n", 
+                obj.tag_name.c_str(), obj.redirect_server.c_str(), obj.firmware_asset_endpoint.c_str());
+
+            if (OTA::performUpdate(&obj, true, true, nullptr) == OTA::SUCCESS) {
+                Serial.println("[OTA] Success! Rebooting...");
+                vTaskDelay(1000);
+                ESP.restart();
+            } else {
+                Serial.println("[OTA] Failed.");
+            }
+        } else {
+            Serial.println("\n[OTA] WiFi Failed.");
+        }
+        
+        // Restore radio state if we didn't reboot
+        ESP.restart(); // Easiest way to restore all state correctly
     }
 
     if (syncFlash)

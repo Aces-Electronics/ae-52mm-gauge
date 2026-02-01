@@ -136,6 +136,16 @@ typedef struct {
     char deviceName[32];
 } lv_ble_ui_data_t;
 
+// Indirect OTA Trigger (from Gateway to Child)
+typedef struct struct_message_ota_trigger {
+  int messageID; // 110
+  char ssid[33];
+  char pass[65];
+  char url[128];
+  char version[12];
+  char md5[33];
+} __attribute__((packed)) struct_message_ota_trigger;
+
 // Backward Compatibility
 typedef struct_message_temp_sensor struct_message_ae_temp_sensor;
 
