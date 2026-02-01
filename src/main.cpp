@@ -142,8 +142,12 @@ unsigned long debounceDelay = 500;  // the debounce time; increase if the output
 #define COLOR_NUM 5
 int ColorArray[COLOR_NUM] = {WHITE, BLUE, GREEN, RED, YELLOW};
 
-// Shared shunt storage and task-synchronisation flag
-volatile bool shuntUiUpdatePending = false;          // set by ESP-NOW callback, cleared in LVGL task
+// Static state for telemetry to avoid heap-churn and queue-overflows
+static struct_message_ae_smart_shunt_1 g_latestShuntState;
+static struct_message_ae_temp_sensor g_latestTempState;
+static SemaphoreHandle_t g_stateMutex = NULL;
+static volatile bool g_shuntStateNew = false;
+static volatile bool g_tempStateNew = false;
 char g_lastErrorStr[32] = "Error";                   // Reused for displaying specific error messages
 
 // Indirect OTA Globals
@@ -219,8 +223,7 @@ SemaphoreHandle_t g_connectedDevicesMutex = NULL;
 float g_lastTemp = -999.0f; // invalid init
 bool enable_ui_temperatureScreen = false; // Wait for data
 bool enable_ui_tpmsScreen = false; // Wait for data
-struct_message_ae_temp_sensor g_lastTempData; // Cache for UI refresh
-bool g_hasTempData = false;
+// Redundant flags removed
 
 // Remember Screen Logic
 bool g_rememberScreen = true;
@@ -823,11 +826,11 @@ extern "C" void cycleTyreDataFn(lv_event_t * e) {
 void tpmsDataCallback(TPMSPosition position, const TPMSSensor* sensor) {
     if (!sensor) return;
     
-    Serial.printf("[TPMS] %s: %.1f PSI, %d°C, %.1fV\n",
+    /* Serial.printf("[TPMS] %s: %.1f PSI, %d°C, %.1fV\n",
                   TPMS_POSITION_SHORT[position], 
                   sensor->pressurePsi, 
                   sensor->temperature, 
-                  sensor->batteryVoltage);
+                  sensor->batteryVoltage); */
     
     // Trigger UI update
     lv_async_call(updateTPMSUI, NULL);
@@ -1645,7 +1648,10 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
         struct_message_ae_temp_sensor relayed;
         
         // Preserve existing name from global state (set by direct RX Case 22)
-        memcpy(&relayed, &g_lastTempData, sizeof(relayed));
+        if (xSemaphoreTake(g_stateMutex, 0) == pdTRUE) {
+            memcpy(&relayed, &g_latestTempState, sizeof(relayed));
+            xSemaphoreGive(g_stateMutex);
+        }
         
         relayed.id = 22;
         relayed.temperature = tmp.mesh.tempSensorTemperature;
@@ -1659,31 +1665,23 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
         relayed.updateInterval = tmp.mesh.tempSensorUpdateInterval; // Actual Interval
         relayed.batteryVoltage = (float)tmp.mesh.tempSensorLastUpdate; // Store AGE in unused float field
         
-        // Update Global State
-        memcpy(&g_lastTempData, &relayed, sizeof(relayed));
+        // Update Global State (Managed by mutex below)
 
         // Check if relayed data is fresh
         if (tmp.mesh.tempSensorLastUpdate != 0xFFFFFFFF && tmp.mesh.tempSensorLastUpdate < 180000) {
             g_lastTempRxTime = millis();
         }
 
-        // Trigger UI Update
-        struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
-        if (tData) {
-            memcpy(tData, &relayed, sizeof(struct_message_ae_temp_sensor));
-            
-            // Queue for UI Task
-            UIQueueEvent evt;
-            evt.type = 2; // Temp (Relayed)
-            evt.data = tData;
-            if (xQueueSend(g_uiQueue, &evt, 0) != pdTRUE) {
-                free(tData); // Queue full, drop packet
-            }
+        // Update Global State (Non-blocking)
+        if (xSemaphoreTake(g_stateMutex, 0) == pdTRUE) {
+            memcpy(&g_latestTempState, &relayed, sizeof(relayed));
+            g_tempStateNew = true;
+            xSemaphoreGive(g_stateMutex);
         }
     }
 
     // Debug
-    Serial.println("Gauge RX: ID 11 (Shunt Data)");
+    // Serial.println("Gauge RX: ID 11 (Shunt Data)");
     // Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
     //               tmp.mesh.batteryVoltage,
     //               tmp.mesh.batteryCurrent,
@@ -1694,30 +1692,14 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 
     // Allocate a copy on the heap for the async callback.
 
-    // Allocate a copy on the heap for the async callback.
-    struct_message_ae_smart_shunt_1 *p = (struct_message_ae_smart_shunt_1 *)malloc(sizeof(*p));
-    if (p == NULL)
-    {
-      Serial.println("Failed to allocate memory for shunt update");
-      break;
-    }
-    memcpy(p, &tmp, sizeof(*p));
-
     // Update Shunt RX Time
     g_lastShuntRxTime = millis();
 
-    // Schedule LVGL-safe update (runs in LVGL thread)
-    // Schedule UI update via Queue (Safe)
-    UIQueueEvent evt;
-    evt.type = 1; // Shunt
-    evt.data = p;
-    if (xQueueSend(g_uiQueue, &evt, 0) != pdTRUE) {
-         static unsigned long lastQueueFullPrint = 0;
-         if (millis() - lastQueueFullPrint > 1000) {
-             Serial.println("UI Queue Full - Dropping Shunt Packet (Throttled)");
-             lastQueueFullPrint = millis();
-         }
-         free(p);
+    // Update Global State (Non-blocking)
+    if (xSemaphoreTake(g_stateMutex, 0) == pdTRUE) {
+        memcpy(&g_latestShuntState, &tmp, sizeof(tmp));
+        g_shuntStateNew = true;
+        xSemaphoreGive(g_stateMutex);
     }
   }
   break;
@@ -1751,7 +1733,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
       memcpy(&tmp, incomingData, sizeof(tmp));
       enable_ui_temperatureScreen = true;
       
-      // Atomic print to prevent garbling
+      /*
       char bigBuff[256];
       snprintf(bigBuff, sizeof(bigBuff), 
         "\n=== Temp Sensor Pkt ===\n"
@@ -1759,7 +1741,8 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
         "=======================\n\n",
         (double)tmp.temperature, (int)tmp.batteryLevel, (unsigned long)tmp.updateInterval);
       
-      Serial.print(bigBuff);
+      Serial.print(bigBuff); 
+      */
       
       // DISCOVERY LOGIC ADDED:
       // Update connected devices map so it shows on Landing Page
@@ -1780,22 +1763,13 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
           }
           xSemaphoreGive(g_connectedDevicesMutex);
       }
-            memcpy(&g_lastTempData, &tmp, sizeof(tmp));
-        g_hasTempData = true;
         g_lastTempRxTime = millis();
         
-        // Allocate heap memory for LVGL async call
-        struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
-        if (tData)
-        {
-          memcpy(tData, &tmp, sizeof(struct_message_ae_temp_sensor));
-          
-          UIQueueEvent evt;
-          evt.type = 2; // Temp (Direct)
-          evt.data = tData;
-          if (xQueueSend(g_uiQueue, &evt, 0) != pdTRUE) {
-              free(tData);
-          }
+        // Update Global State (Non-blocking)
+        if (xSemaphoreTake(g_stateMutex, 0) == pdTRUE) {
+            memcpy(&g_latestTempState, &tmp, sizeof(tmp));
+            g_tempStateNew = true;
+            xSemaphoreGive(g_stateMutex);
         }
       break;
   }
@@ -2046,18 +2020,33 @@ void Task_TFT(void *pvParameters)
   {
     lv_timer_handler();
     
-    // Process UI Updates from Queue (Limit per loop to prevent watchdog trigger)
+    // 1. Process High-Frequency Telemetry from State Buffers (Latest wins)
+    if (g_shuntStateNew) {
+        struct_message_ae_smart_shunt_1 localShunt;
+        if (xSemaphoreTake(g_stateMutex, 0) == pdTRUE) {
+             memcpy(&localShunt, &g_latestShuntState, sizeof(localShunt));
+             g_shuntStateNew = false;
+             xSemaphoreGive(g_stateMutex);
+             lv_update_shunt_ui_cb(&localShunt);
+        }
+    }
+
+    if (g_tempStateNew) {
+        struct_message_ae_temp_sensor localTemp;
+        if (xSemaphoreTake(g_stateMutex, 0) == pdTRUE) {
+             memcpy(&localTemp, &g_latestTempState, sizeof(localTemp));
+             g_tempStateNew = false;
+             xSemaphoreGive(g_stateMutex);
+             lv_update_temp_ui_cb(&localTemp);
+        }
+    }
+
+    // 2. Process / Clean up Remaining Events from Queue
     UIQueueEvent evt;
     int processed = 0;
-    while (processed < 30 && xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
+    while (processed < 20 && xQueueReceive(g_uiQueue, &evt, 0) == pdTRUE) {
         processed++;
-        if (evt.type == 1) { // Shunt
-            lv_update_shunt_ui_cb(evt.data);
-        } else if (evt.type == 2) { // Temp
-            lv_update_temp_ui_cb(evt.data);
-        } else {
-             if(evt.data) free(evt.data);
-        }
+        if(evt.data) free(evt.data); // Free any lingering heap data
     }
     
     // Auto-Refresh TPMS UI if in Auto Mode
@@ -2156,12 +2145,8 @@ void Task_TFT(void *pvParameters)
       case 2:
         changeScreen(ui_temperatureScreen, enable_ui_temperatureScreen, "Temperature Screen");
         // Force Update if data exists
-        if (g_hasTempData) {
-             struct_message_ae_temp_sensor *tData = (struct_message_ae_temp_sensor *)malloc(sizeof(struct_message_ae_temp_sensor));
-             if (tData) {
-                 memcpy(tData, &g_lastTempData, sizeof(struct_message_ae_temp_sensor));
-                 lv_async_call(lv_update_temp_ui_cb, tData);
-             }
+        if (g_tempDataReceived) {
+             g_tempStateNew = true; // Trigger refresh in next loop iteration
         }
         break;
       case 3:
@@ -2170,7 +2155,7 @@ void Task_TFT(void *pvParameters)
 
       }
     }
-    vTaskDelay(5);
+    vTaskDelay(2);
   }
 }
 
@@ -2446,7 +2431,7 @@ void Task_main(void *pvParameters)
             if (now - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS) {
                 // Check for fresh data to start the cycle
                 bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
-                bool tempFresh = g_hasTempData && (now - g_lastTempRxTime < 30000);
+                bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
                 bool tpmsFresh = enable_ui_tpmsScreen;
 
                 if (shuntFresh || tempFresh || tpmsFresh) {
@@ -2469,7 +2454,7 @@ void Task_main(void *pvParameters)
             if (!screen_change_requested && (now - g_lastRotationTime > ROTATION_INTERVAL_MS)) {
                 // Determine eligible screens
                 bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
-                bool tempFresh = g_hasTempData && (now - g_lastTempRxTime < 30000);
+                bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
                 bool tpmsFresh = enable_ui_tpmsScreen;
 
                 // Pick next screen in order (1 -> 2 -> 3 -> 1)
@@ -2519,7 +2504,7 @@ void Task_main(void *pvParameters)
 void setup()
 {
   // flashErase();
-  Serial.begin(115200); /* prepare for possible serial debug */
+  Serial.begin(921600); /* High-speed serial to prevent blocking */
 
   delay(1800); // sit here for a bit to give USB Serial a chance to enumerate
   Serial.println("BOOT: Starting setup...");
@@ -2659,6 +2644,9 @@ void setup()
   g_uiQueue = xQueueCreate(100, sizeof(UIQueueEvent));
   if (!g_uiQueue) Serial.println("FAILED TO CREATE UI QUEUE!");
 
+  g_stateMutex = xSemaphoreCreateMutex();
+  if (!g_stateMutex) Serial.println("FAILED TO CREATE STATE MUTEX!");
+
   g_connectedDevicesMutex = xSemaphoreCreateMutex();
   if (!g_connectedDevicesMutex) Serial.println("FAILED TO CREATE MUTEX!");
 
@@ -2706,8 +2694,8 @@ void setup()
   Serial.printf("BOOT: Free Heap End Setup: %d\n", ESP.getFreeHeap());
 
   // UI Task (Task_TFT) on Core 1, Main Logic on Core 0.
-  // Increase Task_TFT priority slightly to ensure UI responsiveness.
-  BaseType_t res1 = xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 4, NULL, 1);
+  // Increase Task_TFT priority to ensure UI responsiveness.
+  BaseType_t res1 = xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 20480, NULL, 10, NULL, 1);
   if (res1 != pdPASS) Serial.println("BOOT: Task_TFT creation FAILED!");
   else Serial.println("BOOT: Task_TFT created.");
 

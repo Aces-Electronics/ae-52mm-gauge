@@ -10,8 +10,9 @@ Firmware for the Aces Electronics 52mm OLED Gauge, utilizing LVGL for the UI and
     - **Red Heartbeat**: The Gauge's main UI elements will flash **RED** if the Shunt reports a critical error (Load Off, Over Current, E-Fuse Trip).
 - **OTA Updates**: wireless updates via WiFi.
 
-## Build & Flash
-The project uses PlatformIO.
-```bash
-pio run -t upload
-```
+## Communication Protocol (ESP-NOW)
+The Gauge listens for a compact **224-byte Mesh Struct** (`struct_message_ae_smart_shunt_mesh`) broadcast by the Smart Shunt. This ensures reliable data delivery within the standard ESP-NOW frame limits while providing real-time updates for:
+- Main Battery Voltage/Current/SOC
+- Starter Battery Voltage
+- Relayed Temperature Sensors
+- TPMS Pressures
