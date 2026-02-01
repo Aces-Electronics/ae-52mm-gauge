@@ -5,6 +5,7 @@
 #include <ui.h>
 #include <esp_now.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <nvs_flash.h>
 #include <Preferences.h>
 #include <aes/esp_aes.h> // AES library for decrypting the Victron manufacturer data.
@@ -2340,7 +2341,7 @@ void Task_main(void *pvParameters)
             client.setCACert(OTAGH_CA_CERT);
             OTA::init(client);
 
-            UpdateObject obj;
+            OTA::UpdateObject obj;
             obj.condition = OTA::NEW_DIFFERENT;
             obj.tag_name = String(g_otaTrigger.version);
             
