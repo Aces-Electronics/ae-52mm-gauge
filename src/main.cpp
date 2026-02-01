@@ -1641,7 +1641,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Logging removed to prevent stalling
     
     enable_ui_temperatureScreen = hasValidTemp;
-    g_hasTempData = hasValidTemp;
+    if (hasValidTemp) g_tempDataReceived = true;
 
     if (hasValidTemp) {
         // We have valid relayed data
