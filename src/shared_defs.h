@@ -93,6 +93,14 @@ typedef struct struct_message_ae_smart_shunt_1 {
   char tempSensorName[32]; // ADDED: Relayed Device Name
   uint8_t tempSensorHardwareVersion;
   char tempSensorFirmwareVersion[12];
+  uint8_t tempSensorMac[6]; // MAC address of temp sensor
+  
+  // Gauge Data (Relayed)
+  char gaugeName[32];
+  uint8_t gaugeHardwareVersion;
+  char gaugeFirmwareVersion[12];
+  uint8_t gaugeMac[6]; // MAC address of gauge
+  uint32_t gaugeLastUpdate;
   
   // Hardware Version (injected at compile time)
   uint8_t hardwareVersion;
