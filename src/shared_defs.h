@@ -61,49 +61,57 @@ typedef struct struct_message_voltage0 {
   float rearAuxBatt1I; 
 } struct_message_voltage0;
 
-typedef struct struct_message_ae_smart_shunt_1 {
+// Core Telemetry sent over ESP-NOW Mesh (must be < 250 bytes)
+typedef struct struct_message_ae_smart_shunt_mesh {
   int messageID;
   bool dataChanged;
   float batteryVoltage;
   float batteryCurrent;
-  float batteryCurrentAvg;
+  float batteryCurrentAvg; 
   float batteryPower;
   float batterySOC;
   float batteryCapacity;
   int batteryState;
-  char runFlatTime[40];
+  char runFlatTime[32]; 
   float starterBatteryVoltage;
   bool isCalibrated;
   float lastHourWh;
   float lastDayWh;
   float lastWeekWh;
-  char name[32];   // Device name (e.g., "AE Smart Shunt" or custom)
+  char name[32];   
   
-  // TPMS Data (Offloaded)
+  // TPMS Data (Relayed to Gauge)
   float tpmsPressurePsi[4];
   int tpmsTemperature[4];
   float tpmsVoltage[4];
   uint32_t tpmsLastUpdate[4];
 
-  // Temp Sensor Data (Relayed)
+  // Temp Sensor Data (Core fields relayed to Gauge)
   float tempSensorTemperature;
   uint8_t tempSensorBatteryLevel;
-  uint32_t tempSensorUpdateInterval; // Added for Staleness Logic
+  uint32_t tempSensorUpdateInterval; 
   uint32_t tempSensorLastUpdate;
-  char tempSensorName[32]; // ADDED: Relayed Device Name
+  char tempSensorName[32]; 
+
+  // Hardware Version
+  uint8_t hardwareVersion;
+} __attribute__((packed)) struct_message_ae_smart_shunt_mesh;
+
+// Full Telemetry used by Shunt for MQTT/Cloud (Internal use)
+typedef struct struct_message_ae_smart_shunt_1 {
+  struct_message_ae_smart_shunt_mesh mesh;
+  
+  // Extended Temp metadata (Relayed to Cloud only)
   uint8_t tempSensorHardwareVersion;
   char tempSensorFirmwareVersion[12];
-  uint8_t tempSensorMac[6]; // MAC address of temp sensor
-  
-  // Gauge Data (Relayed)
+  uint8_t tempSensorMac[6]; 
+
+  // Gauge Data (Relayed to Cloud only)
   char gaugeName[32];
   uint8_t gaugeHardwareVersion;
   char gaugeFirmwareVersion[12];
-  uint8_t gaugeMac[6]; // MAC address of gauge
+  uint8_t gaugeMac[6]; 
   uint32_t gaugeLastUpdate;
-  
-  // Hardware Version (injected at compile time)
-  uint8_t hardwareVersion;
 } __attribute__((packed)) struct_message_ae_smart_shunt_1;
 
 typedef struct struct_message_tpms_config {

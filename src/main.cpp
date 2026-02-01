@@ -1249,8 +1249,8 @@ static void lv_update_shunt_ui_cb(void *user_data)
   }
 
   // SAFETY: Enforce null termination on strings to prevent buffer overruns/crashes
-  p->name[sizeof(p->name) - 1] = '\0';
-  p->runFlatTime[sizeof(p->runFlatTime) - 1] = '\0';
+  p->mesh.name[sizeof(p->mesh.name) - 1] = '\0';
+  p->mesh.runFlatTime[sizeof(p->mesh.runFlatTime) - 1] = '\0';
 
   // AUTO-SWITCH and AUTO-LOCK Logic:
   
@@ -1288,10 +1288,10 @@ static void lv_update_shunt_ui_cb(void *user_data)
   if (screen_index > 0 && !g_qrActive && !g_heartbeat_timer) {
       lv_obj_clear_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
       lv_label_set_text_fmt(ui_aeLandingBottomLabel, "%s: %.2fV  %.2fA  %.2fW",
-                            p->name[0] ? p->name : "AE Smart Shunt",
-                            p->batteryVoltage,
-                            p->batteryCurrent,
-                            p->batteryPower);
+                            p->mesh.name[0] ? p->mesh.name : "AE Smart Shunt",
+                            p->mesh.batteryVoltage,
+                            p->mesh.batteryCurrent,
+                            p->mesh.batteryPower);
   }
   
   // FORCE HIDE 'Waiting' Label (Robustness against desync)
@@ -1308,18 +1308,18 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   // Change: Outer Arc now displays SOC (0-100%) instead of Voltage
   lv_arc_set_range(ui_SBattVArc, 0, 100);
-  lv_arc_set_value(ui_SBattVArc, (int)(p->batterySOC * 100.0f));
+  lv_arc_set_value(ui_SBattVArc, (int)(p->mesh.batterySOC * 100.0f));
 
-  lv_label_set_text_fmt(ui_battVLabelSensor, "%05.2f", p->batteryVoltage);
+  lv_label_set_text_fmt(ui_battVLabelSensor, "%05.2f", p->mesh.batteryVoltage);
   
-  lv_label_set_text_fmt(ui_battALabelSensor, "%05.2f", p->batteryCurrent);
-  lv_arc_set_value(ui_SA1Arc, (int)(p->batteryCurrent));
+  lv_label_set_text_fmt(ui_battALabelSensor, "%05.2f", p->mesh.batteryCurrent);
+  lv_arc_set_value(ui_SA1Arc, (int)(p->mesh.batteryCurrent));
 
-  lv_label_set_text_fmt(ui_SOCLabel, "%.0f%%", p->batterySOC * 100.0f);
+  lv_label_set_text_fmt(ui_SOCLabel, "%.0f%%", p->mesh.batterySOC * 100.0f);
 
   // Update Cache for Animation Timer
-  g_cachedStarterVoltage = p->starterBatteryVoltage;
-  strncpy(g_cachedRunFlatTime, p->runFlatTime, sizeof(g_cachedRunFlatTime) - 1);
+  g_cachedStarterVoltage = p->mesh.starterBatteryVoltage;
+  strncpy(g_cachedRunFlatTime, p->mesh.runFlatTime, sizeof(g_cachedRunFlatTime) - 1);
   g_cachedRunFlatTime[sizeof(g_cachedRunFlatTime) - 1] = '\0';
 
   // Ensure timer is running (lazy init if not done in setup)
@@ -1332,8 +1332,8 @@ static void lv_update_shunt_ui_cb(void *user_data)
   // 1. Estimate Battery Total Capacity (Wh) to define scale.
   // MaxAh = RemainingAh / SOC
   float maxAh = 100.0f; // Default
-  if (p->batterySOC > 0.01f) {
-      maxAh = p->batteryCapacity / p->batterySOC;
+  if (p->mesh.batterySOC > 0.01f) {
+      maxAh = p->mesh.batteryCapacity / p->mesh.batterySOC;
   }
   float maxWh_Daily = maxAh * 12.0f; // Nominal 12V
   float maxWh_Weekly = maxWh_Daily * 7.0f;
@@ -1341,13 +1341,13 @@ static void lv_update_shunt_ui_cb(void *user_data)
   // 2. Scale Values to +/- 100 range
   // Daily
   int32_t barDayVal = 0;
-  if (maxWh_Daily > 0) barDayVal = (int32_t)((p->lastDayWh / maxWh_Daily) * 100.0f);
+  if (maxWh_Daily > 0) barDayVal = (int32_t)((p->mesh.lastDayWh / maxWh_Daily) * 100.0f);
   if (barDayVal > 100) barDayVal = 100;
   if (barDayVal < -100) barDayVal = -100;
 
   // Weekly
   int32_t barWeekVal = 0;
-  if (maxWh_Weekly > 0) barWeekVal = (int32_t)((p->lastWeekWh / maxWh_Weekly) * 100.0f);
+  if (maxWh_Weekly > 0) barWeekVal = (int32_t)((p->mesh.lastWeekWh / maxWh_Weekly) * 100.0f);
   if (barWeekVal > 100) barWeekVal = 100;
   if (barWeekVal < -100) barWeekVal = -100;
 
@@ -1359,7 +1359,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
   if (ui_BarWeekLabel) {
       char buf[16];
       // Inline formatting logic since helper was removed
-      float abs_wh = fabs(p->lastWeekWh);
+      float abs_wh = fabs(p->mesh.lastWeekWh);
       if (abs_wh > 99.0f) {
            snprintf(buf, sizeof(buf), "%.1f", abs_wh / 1000.0f);
       } else {
@@ -1371,7 +1371,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
   // Daily
   if (ui_BarDayLabel) {
       char buf[16];
-      float abs_wh = fabs(p->lastDayWh);
+      float abs_wh = fabs(p->mesh.lastDayWh);
        if (abs_wh > 99.0f) {
            snprintf(buf, sizeof(buf), "%.1f", abs_wh / 1000.0f);
       } else {
@@ -1403,25 +1403,25 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   // --- Battery issue detection and heartbeat flash ---
   bool battery_issue = false;
-  if (p->batterySOC >= 0.0f && p->batterySOC < BATTERY_SOC_ALERT) {
+  if (p->mesh.batterySOC >= 0.0f && p->mesh.batterySOC < BATTERY_SOC_ALERT) {
       battery_issue = true;
-      snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "LOW SOC: %.0f%%", p->batterySOC * 100.0f);
+      snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "LOW SOC: %.0f%%", p->mesh.batterySOC * 100.0f);
   }
-  if (fabsf(p->batteryCurrent) > BATTERY_CURRENT_ALERT_A) {
+  if (fabsf(p->mesh.batteryCurrent) > BATTERY_CURRENT_ALERT_A) {
       battery_issue = true;
       snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "OVER CURRENT");
   }
-  if (p->batteryVoltage < BATTERY_VOLTAGE_LOW) {
+  if (p->mesh.batteryVoltage < BATTERY_VOLTAGE_LOW) {
       battery_issue = true;
       snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "LOW VOLTAGE");
   }
-  else if (p->batteryVoltage > BATTERY_VOLTAGE_HIGH) {
+  else if (p->mesh.batteryVoltage > BATTERY_VOLTAGE_HIGH) {
       battery_issue = true;
       snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "HIGH VOLTAGE");
   }
   
   // New Error States (Load Off, E-Fuse, Over Current)
-  if (p->batteryState != 0) {
+  if (p->mesh.batteryState != 0) {
       battery_issue = true;
       // Decode batteryState bitmask if possible, else generic
        snprintf(g_lastErrorStr, sizeof(g_lastErrorStr), "PROTECTION ACTIVE");
@@ -1563,56 +1563,43 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     //     Serial.printf("SCAN: Recv ID 11 from %s\n", macStr);
     // }
     
-    struct_message_ae_smart_shunt_1 incomingReadings;
+    struct_message_ae_smart_shunt_mesh incomingReadings;
     memset(&incomingReadings, 0, sizeof(incomingReadings)); // Clear to avoid garbage
     
-    // Safety Check: Size Mismatch
-    if (len != sizeof(incomingReadings)) {
-        // Serial.printf("[ERROR] Size Mismatch! Rx: %d, Exp: %d\n", len, sizeof(incomingReadings));
-        if (len < sizeof(incomingReadings)) return; // Too short, discard.
+    // Safety Check: Size Mismatch (Allow larger if driver permits, but cap at mesh size for local processing)
+    if (len < (int)sizeof(incomingReadings)) {
+        return; // Too short, discard.
     }
     
-    // Safe Copy (Limit to struct size)
-    memcpy(&incomingReadings, incomingData, (len < sizeof(incomingReadings)) ? len : sizeof(incomingReadings));
-
-    // --- VERBOSE LOGGING REMOVED ---
-    // Serial.println("=== Gauge RX Shunt Data ===");
-    // ...
+    // Safe Copy (Limit to mesh struct size)
+    memcpy(&incomingReadings, incomingData, sizeof(incomingReadings));
 
   // Protocol Separation Security Check:
   // If we are strictly paired, we MUST ignore "Discovery Beacons" (ID 33).
   // ID 33 is only for finding new devices (Scanning Mode).
   // If we accept ID 33 while paired, a reset/public shunt can overwrite our data.
   if (g_isPaired && incomingReadings.messageID == 33) {
-      // Serial.println("Ignored: Protocol 33 (Beacon) from Paired Device.");
       return; 
   }
   
     // Strict Filtering if Paired
     if (g_isPaired) {
         if (memcmp(mac, g_pairedMac, 6) != 0) {
-            // Silently ignore or print only if needed
-            // Serial.println("Ignored: Data from non-paired device.");
             return;
         }
     }
-    // else: accept all (Discovery Mode / Legacy)
 
     // Update connected devices map
     if (xSemaphoreTake(g_connectedDevicesMutex, 0) == pdTRUE) {
         connectedDevices[String(macStr)] = {"AE Smart Shunt", millis()};
-        if (g_scanningMode) {
-           Serial.printf("SCAN: Added/Updated Device List -> %s\n", macStr);
-        }
         xSemaphoreGive(g_connectedDevicesMutex);
     }
 
-    // Defensive copy: zero target and copy up to struct size
+    // Defensive copy: zero target and copy mesh portion
     struct_message_ae_smart_shunt_1 tmp;
     memset(&tmp, 0, sizeof(tmp));
-    size_t toCopy = len < (int)sizeof(tmp) ? len : sizeof(tmp);
-    memcpy(&tmp, incomingData, toCopy);
-    tmp.runFlatTime[sizeof(tmp.runFlatTime) - 1] = '\0'; // ensure NUL
+    memcpy(&tmp.mesh, &incomingReadings, sizeof(incomingReadings));
+    tmp.mesh.name[sizeof(tmp.mesh.name) - 1] = '\0'; // ensure NUL
 
     // Enable Screens
     enable_ui_batteryScreen = true;
@@ -1622,7 +1609,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     for(int i=0; i<4; i++) {
         // Shunt reports age in ms. 0xFFFFFFFF means "Not Configured".
         // We show the screen if ANY sensor is configured, regardless of staleness (Show Last Known).
-        if(tmp.tpmsLastUpdate[i] != 0xFFFFFFFF) {
+        if(tmp.mesh.tpmsLastUpdate[i] != 0xFFFFFFFF) {
             hasTPMS = true;
         }
     }
@@ -1632,12 +1619,12 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Extract TPMS Data from Shunt
     for(int i=0; i<4; i++) {
          tpmsHandler.updateSensorData(i, 
-             tmp.tpmsPressurePsi[i], 
-             tmp.tpmsTemperature[i], 
-             tmp.tpmsVoltage[i], 
-             tmp.tpmsLastUpdate[i]
+             tmp.mesh.tpmsPressurePsi[i], 
+             tmp.mesh.tpmsTemperature[i], 
+             tmp.mesh.tpmsVoltage[i], 
+             tmp.mesh.tpmsLastUpdate[i]
          );
-         if (tmp.tpmsLastUpdate[i] > 0 && tmp.tpmsLastUpdate[i] != 0xFFFFFFFF) {
+         if (tmp.mesh.tpmsLastUpdate[i] > 0 && tmp.mesh.tpmsLastUpdate[i] != 0xFFFFFFFF) {
              g_lastTPMSRxTime = millis();
          }
     }
@@ -1645,9 +1632,9 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Checking Relayed Temp Sensor Data 
     // Age of 0xFFFFFFFF means "Never updated" or "Sentinel". 
     // Data is valid if it is NOT sentinel AND Age < (Interval + 30s buffer).
-    uint32_t tempTimeout = (tmp.tempSensorUpdateInterval > 0) ? (tmp.tempSensorUpdateInterval + 30000) : 180000;
+    uint32_t tempTimeout = (tmp.mesh.tempSensorUpdateInterval > 0) ? (tmp.mesh.tempSensorUpdateInterval + 30000) : 180000;
     
-    bool hasValidTemp = (tmp.tempSensorLastUpdate > 0 && tmp.tempSensorLastUpdate != 0xFFFFFFFF && tmp.tempSensorLastUpdate < tempTimeout);
+    bool hasValidTemp = (tmp.mesh.tempSensorLastUpdate > 0 && tmp.mesh.tempSensorLastUpdate != 0xFFFFFFFF && tmp.mesh.tempSensorLastUpdate < tempTimeout);
     // Logging removed to prevent stalling
     
     enable_ui_temperatureScreen = hasValidTemp;
@@ -1661,22 +1648,22 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
         memcpy(&relayed, &g_lastTempData, sizeof(relayed));
         
         relayed.id = 22;
-        relayed.temperature = tmp.tempSensorTemperature;
+        relayed.temperature = tmp.mesh.tempSensorTemperature;
         
         // Use Name from Shunt if available
-        if (tmp.tempSensorName[0] != '\0') {
-           strncpy(relayed.name, tmp.tempSensorName, sizeof(relayed.name)-1);
+        if (tmp.mesh.tempSensorName[0] != '\0') {
+           strncpy(relayed.name, tmp.mesh.tempSensorName, sizeof(relayed.name)-1);
            relayed.name[sizeof(relayed.name)-1] = '\0';
         }
-        relayed.batteryLevel = tmp.tempSensorBatteryLevel;
-        relayed.updateInterval = tmp.tempSensorUpdateInterval; // Actual Interval
-        relayed.batteryVoltage = (float)tmp.tempSensorLastUpdate; // Store AGE in unused float field
+        relayed.batteryLevel = tmp.mesh.tempSensorBatteryLevel;
+        relayed.updateInterval = tmp.mesh.tempSensorUpdateInterval; // Actual Interval
+        relayed.batteryVoltage = (float)tmp.mesh.tempSensorLastUpdate; // Store AGE in unused float field
         
         // Update Global State
         memcpy(&g_lastTempData, &relayed, sizeof(relayed));
 
         // Check if relayed data is fresh
-        if (tmp.tempSensorLastUpdate != 0xFFFFFFFF && tmp.tempSensorLastUpdate < 180000) {
+        if (tmp.mesh.tempSensorLastUpdate != 0xFFFFFFFF && tmp.mesh.tempSensorLastUpdate < 180000) {
             g_lastTempRxTime = millis();
         }
 
@@ -1698,12 +1685,12 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Debug
     Serial.println("Gauge RX: ID 11 (Shunt Data)");
     // Serial.printf("Queued Shunt: V=%.2f A=%.2f W=%.2f SOC=%.1f%% Capacity=%.2f Ah Run=%s\n",
-    //               tmp.batteryVoltage,
-    //               tmp.batteryCurrent,
-    //               tmp.batteryPower,
-    //               tmp.batterySOC * 100.0f,
-    //               tmp.batteryCapacity,
-    //               tmp.runFlatTime);
+    //               tmp.mesh.batteryVoltage,
+    //               tmp.mesh.batteryCurrent,
+    //               tmp.mesh.batteryPower,
+    //               tmp.mesh.batterySOC * 100.0f,
+    //               tmp.mesh.batteryCapacity,
+    //               tmp.mesh.runFlatTime);
 
     // Allocate a copy on the heap for the async callback.
 
