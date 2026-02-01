@@ -1443,8 +1443,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
     }
   }
 
-  // Free the heap memory we allocated in the ESP-NOW callback
-  free(p);
+  // No longer freeing local stack pointer
 }
 
 static void lv_update_temp_ui_cb(void *user_data)
@@ -1533,7 +1532,7 @@ static void lv_update_temp_ui_cb(void *user_data)
          }
     }
 
-    free(p);
+    // No longer freeing local stack pointer
 }
 
 // Callback when data is received
