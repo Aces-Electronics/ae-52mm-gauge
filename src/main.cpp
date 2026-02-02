@@ -1606,17 +1606,17 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     // Enable Screens
     enable_ui_batteryScreen = true;
     
-    // Check for valid TPMS data (non-sentinel and fresh)
-    bool hasTPMS = false;
+    // Check for configured sensors and valid data
+    bool hasPairedSensors = tpmsHandler.anyConfigured();
+    bool hasActiveData = false;
     for(int i=0; i<4; i++) {
-        // Shunt reports age in ms. 0xFFFFFFFF means "Not Configured".
-        // We show the screen if ANY sensor is configured, regardless of staleness (Show Last Known).
-        if(tmp.mesh.tpmsLastUpdate[i] != 0xFFFFFFFF) {
-            hasTPMS = true;
+        if(tmp.mesh.tpmsLastUpdate[i] != 0xFFFFFFFF && tmp.mesh.tpmsLastUpdate[i] < 300000) {
+            hasActiveData = true;
         }
     }
-    enable_ui_tpmsScreen = hasTPMS;
-    if (hasTPMS) g_tpmsDataReceived = true; // Use this to unhide the screen if data is fresh
+    
+    enable_ui_tpmsScreen = hasPairedSensors; // Enable screen if user has paired sensors
+    if (hasActiveData && hasPairedSensors) g_tpmsDataReceived = true; 
 
     // Extract TPMS Data from Shunt
     for(int i=0; i<4; i++) {
@@ -2427,13 +2427,13 @@ void Task_main(void *pvParameters)
     if (!settingsState && !g_rememberScreen && !g_qrActive && !g_resetPending) {
         // Condition to START auto-rotation: User is on Home Page and Dwell has passed
         if (screen_index == 0) {
-            if (now - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS) {
-                // Check for fresh data to start the cycle
-                bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
-                bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
-                bool tpmsFresh = enable_ui_tpmsScreen;
+                if (now - g_lastScreenSwitchTime > AUTO_SWITCH_DWELL_MS) {
+                    // Check for fresh data to start the cycle
+                    bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
+                    bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
+                    bool tpmsFresh = g_tpmsDataReceived && (now - g_lastTPMSRxTime < 180000); // 3 min threshold
 
-                if (shuntFresh || tempFresh || tpmsFresh) {
+                    if (shuntFresh || tempFresh || tpmsFresh) {
                     g_isAutoRotating = true;
                     // Move to the first available fresh screen
                     if (shuntFresh) screen_index = 1;
@@ -2454,7 +2454,7 @@ void Task_main(void *pvParameters)
                 // Determine eligible screens
                 bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
                 bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
-                bool tpmsFresh = enable_ui_tpmsScreen;
+                bool tpmsFresh = g_tpmsDataReceived && (now - g_lastTPMSRxTime < 180000); // 3 min threshold
 
                 // Pick next screen in order (1 -> 2 -> 3 -> 1)
                 int next = screen_index;

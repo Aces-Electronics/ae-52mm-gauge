@@ -99,6 +99,7 @@ public:
     TPMSSensor* getSensor(TPMSPosition position);
     const TPMSSensor* getSensor(TPMSPosition position) const;
     bool isConfigured(TPMSPosition position) const;
+    bool anyConfigured() const;
     bool allConfigured() const;
     
     // NVS persistence

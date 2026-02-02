@@ -357,6 +357,10 @@ void TPMSHandler::stringToMac(const String& str, uint8_t* mac) {
 TPMSSensor* TPMSHandler::getSensor(TPMSPosition position) { return &sensors[position]; }
 const TPMSSensor* TPMSHandler::getSensor(TPMSPosition position) const { return &sensors[position]; }
 bool TPMSHandler::isConfigured(TPMSPosition position) const { return sensors[position].configured; }
+bool TPMSHandler::anyConfigured() const { 
+    for(int i=0; i<TPMS_COUNT; i++) if(sensors[i].configured) return true;
+    return false; 
+}
 bool TPMSHandler::allConfigured() const { 
     for(int i=0; i<TPMS_COUNT; i++) if(!sensors[i].configured) return false;
     return true; 
