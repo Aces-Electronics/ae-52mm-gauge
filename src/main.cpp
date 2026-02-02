@@ -2352,8 +2352,11 @@ void Task_main(void *pvParameters)
         Serial.println("[OTA] Processing Indirect OTA Trigger...");
         
         // Show update message and Pause UI
-        enter_ota_ui_mode();
-        vTaskDelay(200); // Allow frame buffer to flush completely to display
+        // OPI Bus Contention Fix: Turn OFF Display to save bandwidth
+        // enter_ota_ui_mode(); 
+        ledcWrite(pwmChannel, 0); // Backlight OFF
+        gfx->displayOff();        // Stop LCD Peripheral
+        vTaskDelay(200); 
         g_pauseUI = true;
         
         // 1. Stop ESP-NOW and BLE for WiFi stability & RAM
