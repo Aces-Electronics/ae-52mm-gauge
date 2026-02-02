@@ -668,6 +668,12 @@ void triggerGlobalAlert();
 void updateTPMSUI(void* arg) {
     (void)arg;
 
+    // Optimization: Only update if screen is active or about to be
+    extern int screen_index;
+    if (screen_index != 3 && (!ui_tpmsScreen || lv_obj_has_flag(ui_tpmsScreen, LV_OBJ_FLAG_HIDDEN))) {
+        return; 
+    }
+
     // Unhide UI on first data packet
     // Unhide UI on data packet (Idempotent)
     if (g_tpmsDataReceived) {
@@ -1495,6 +1501,12 @@ static void lv_update_temp_ui_cb(void *user_data)
     g_lastTemp = p->temperature;
 
     // Update Name
+    // Debug: Log what name is being set to trace Ghost TPMS issue
+    static char lastLoggedName[32] = "";
+    if (strncmp(lastLoggedName, p->name, 31) != 0) {
+        Serial.printf("[DEBUG] Temp Screen Name Update: '%s'\n", p->name);
+        strncpy(lastLoggedName, p->name, 31);
+    }
     lv_label_set_text(ui_TempNameLabel, p->name);
 
     // Update Battery (Only show if <= 15%)
@@ -2149,7 +2161,7 @@ void Task_TFT(void *pvParameters)
         }
         break;
       case 3:
-        changeScreen(ui_tpmsScreen, true, "TPMS Screen");
+        changeScreen(ui_tpmsScreen, enable_ui_tpmsScreen, "TPMS Screen");
         break;
 
       }
@@ -2430,6 +2442,14 @@ void Task_main(void *pvParameters)
     bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
     bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
     bool tpmsFresh = g_tpmsDataReceived && (now - g_lastTPMSRxTime < 180000); // 3 min threshold
+
+    if (loopCounter % 200 == 0) { // Log every ~2s
+        Serial.printf("[DEBUG] Screen State: Idx=%d Auto=%d | Shunt: %d (%lu ms) | Temp: %d (%lu ms) | TPMS: %d (%lu ms, Conf: %d)\n", 
+            screen_index, g_isAutoRotating,
+            shuntFresh, now - g_lastShuntRxTime,
+            tempFresh, now - g_lastTempRxTime,
+            tpmsFresh, now - g_lastTPMSRxTime, tpmsHandler.anyConfigured());
+    }
 
     // 2. Update Enable Flags
     enable_ui_batteryScreen = shuntFresh; 
