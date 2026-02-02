@@ -157,7 +157,7 @@ typedef struct struct_message_ota_trigger {
   int messageID; // 110
   char ssid[33];
   char pass[65];
-  char url[128];
+  char url[96];
   char version[12];
   char md5[33];
   bool force; // New Flag
