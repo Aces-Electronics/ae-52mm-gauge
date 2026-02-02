@@ -153,6 +153,7 @@ char g_lastErrorStr[32] = "Error";                   // Reused for displaying sp
 // Indirect OTA Globals
 volatile bool g_indirectOtaPending = false;
 struct_message_ota_trigger g_otaTrigger;
+volatile bool g_pauseUI = false; // Freeze UI during critical OTA ops
 
 // Phase 8: Dynamic Staleness
 uint32_t g_tempUpdateInterval = 30000; // Default 30s
@@ -2037,6 +2038,11 @@ void Task_TFT(void *pvParameters)
 {
   while (1)
   {
+    if (g_pauseUI) {
+        vTaskDelay(100);
+        continue;
+    }
+    
     lv_timer_handler();
     
     // 1. Process High-Frequency Telemetry from State Buffers (Latest wins)
@@ -2307,6 +2313,14 @@ void Task_main(void *pvParameters)
     if (g_indirectOtaPending) {
         g_indirectOtaPending = false;
         Serial.println("[OTA] Processing Indirect OTA Trigger...");
+        
+        // Show update message and Pause UI
+        if(ui_batteryCentralLabel) {
+            lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(ui_batteryCentralLabel, "Updating...");
+            lv_timer_handler(); // Render one last frame
+        }
+        g_pauseUI = true;
         
         // 1. Stop ESP-NOW and BLE for WiFi stability & RAM
         esp_now_deinit();
