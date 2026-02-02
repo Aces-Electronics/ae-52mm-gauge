@@ -154,6 +154,20 @@ char g_lastErrorStr[32] = "Error";                   // Reused for displaying sp
 volatile bool g_indirectOtaPending = false;
 struct_message_ota_trigger g_otaTrigger;
 
+// Phase 8: Dynamic Staleness
+uint32_t g_tempUpdateInterval = 30000; // Default 30s
+
+// Data Sent Callback
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  /* Serial.printf("[ESP-NOW] Packet Sent to %02X:%02X:%02X:%02X:%02X:%02X Status: %s\n",
+    mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5],
+    status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail"); */
+  // Only log fail to reduce noise? User asked for debug.
+  Serial.printf("[ESP-NOW] TX -> %02X:%02X:%02X:%02X:%02X:%02X | %s\n",
+    mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5],
+    status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
+}
+
 // Helper to toggle between Normal View and Error View
 void toggle_error_view(bool show_error) {
     if (!ui_batteryScreen) return;
@@ -1565,9 +1579,8 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     
-    // if (g_scanningMode) {
-    //     Serial.printf("SCAN: Recv ID 11 from %s\n", macStr);
-    // }
+    // Strict Data Logging
+    Serial.printf("[ESP-NOW] RX <- %s | ID: %d | Size: %d\n", macStr, incomingData[0], len);
     
     struct_message_ae_smart_shunt_mesh incomingReadings;
     memset(&incomingReadings, 0, sizeof(incomingReadings)); // Clear to avoid garbage
@@ -1637,8 +1650,11 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 
     // Checking Relayed Temp Sensor Data 
     // Age of 0xFFFFFFFF means "Never updated" or "Sentinel". 
-    // Data is valid if it is NOT sentinel AND Age < (Interval + 30s buffer).
-    uint32_t tempTimeout = (tmp.mesh.tempSensorUpdateInterval > 0) ? (tmp.mesh.tempSensorUpdateInterval + 30000) : 180000;
+    // Phase 8: Use dynamic interval from Shunt
+    uint32_t reportedInterval = tmp.mesh.tempSensorUpdateInterval;
+    if (reportedInterval > 0) g_tempUpdateInterval = reportedInterval;
+
+    uint32_t tempTimeout = (g_tempUpdateInterval > 0) ? (g_tempUpdateInterval + 30000) : 180000;
     
     bool hasValidTemp = (tmp.mesh.tempSensorLastUpdate > 0 && tmp.mesh.tempSensorLastUpdate != 0xFFFFFFFF && tmp.mesh.tempSensorLastUpdate < tempTimeout);
     // Logging removed to prevent stalling
@@ -2431,14 +2447,30 @@ void Task_main(void *pvParameters)
 
     // --- Freshness & exposure logic ---
     // 1. Determine Freshness
+    // Phase 8: Dynamic Temp Timeout
+    uint32_t fluxTempTimeout = (g_tempUpdateInterval > 0) ? (g_tempUpdateInterval + 15000) : 45000; 
+
     bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
-    bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
+    bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < fluxTempTimeout);
     bool tpmsFresh = g_tpmsDataReceived && (now - g_lastTPMSRxTime < 180000); // 3 min threshold
+
+    // Phase 8: Disconnection Alert Logic
+    // Detect transition from Connected (Enabled) -> Stale (Disabled)
+    static bool wasTempEnabled = false;
+    static bool firstRunComplete = false;
 
     // 2. Update Enable Flags
     enable_ui_batteryScreen = shuntFresh; 
     enable_ui_temperatureScreen = tempFresh;
     enable_ui_tpmsScreen = tpmsFresh && tpmsHandler.anyConfigured(); 
+
+    // Trigger Heartbeat on Stale Transition
+    if (wasTempEnabled && !enable_ui_temperatureScreen && firstRunComplete) {
+         Serial.println("[ALERT] Temp Sensor Disconnected! Triggering Heartbeat.");
+         lv_async_call([](void*){ triggerGlobalAlert(); }, NULL);
+    }
+    wasTempEnabled = enable_ui_temperatureScreen;
+    firstRunComplete = true;
 
     // 3. Force Exit if Current Screen is Disabled (Stale)
     if (screen_index == 1 && !enable_ui_batteryScreen) { 
@@ -2652,7 +2684,8 @@ void setup()
   }
 
   // Register for a callback function that will be called when data is received
-  esp_now_register_recv_cb(OnDataRecv); // working well, just needs to be enabled when ready
+  esp_now_register_recv_cb(OnDataRecv); 
+  esp_now_register_send_cb(OnDataSent); // Phase 8: Logging
 
   String LVGL_Arduino = "Hello from an AE 52mm Gauge using LVGL: ";
   LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
