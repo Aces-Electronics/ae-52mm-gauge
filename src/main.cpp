@@ -2310,7 +2310,14 @@ void Task_main(void *pvParameters)
         
         // 1. Stop ESP-NOW and BLE for WiFi stability & RAM
         esp_now_deinit();
-        BLEDevice::deinit(true); // Free memory
+        
+        // Safely shutdown BLE
+        bleHandler.stopScan(); 
+        delay(100); // Give scan task time to stop
+        if (BLEDevice::getInitialized()) {
+             BLEDevice::deinit(true); // Free memory
+        }
+        
         WiFi.disconnect(true);
         WiFi.mode(WIFI_STA);
         
