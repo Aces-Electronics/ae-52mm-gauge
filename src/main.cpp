@@ -101,7 +101,7 @@ QueueHandle_t g_uiQueue;
 bool screen_change_requested = false;
 
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[screenWidth * screenHeight / 5];
+static lv_color_t *buf;
 
 bool bezel_right = false;
 bool bezel_left = false;
@@ -2723,6 +2723,16 @@ void setup()
   if (!g_connectedDevicesMutex) Serial.println("FAILED TO CREATE MUTEX!");
 
   lv_init();
+
+  // Move LVGL buffer to PSRAM (frees 92KB of SRAM)
+  size_t buf_size = sizeof(lv_color_t) * screenWidth * screenHeight / 5;
+  buf = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
+  if (!buf) {
+       Serial.println("CRITICAL: Failed to allocate LVGL buffer in PSRAM! Falling back to Heap (Safety Risk)");
+       buf = (lv_color_t *)malloc(buf_size);
+  } else {
+       Serial.println("LVGL Buffer allocated in PSRAM");
+  }
 
   lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * screenHeight / 5);
 
