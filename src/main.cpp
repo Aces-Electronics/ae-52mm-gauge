@@ -169,7 +169,44 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
     status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
 }
 
-// Helper to toggle between Normal View and Error View
+// Helper to enter clean OTA state
+void enter_ota_ui_mode() {
+    if (!ui_batteryScreen) return;
+    
+    // Switch to battery screen if not there logic? 
+    // Assuming we are on it or user can see it.
+    
+    // Hide everything
+    if(ui_SBattVArc) lv_obj_add_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
+    if(ui_SA1Arc) lv_obj_add_flag(ui_SA1Arc, LV_OBJ_FLAG_HIDDEN);
+    if(ui_battVLabelSensor) lv_obj_add_flag(ui_battVLabelSensor, LV_OBJ_FLAG_HIDDEN);
+    if(ui_battALabelSensor) lv_obj_add_flag(ui_battALabelSensor, LV_OBJ_FLAG_HIDDEN);
+    if(ui_batteryVLabel) lv_obj_add_flag(ui_batteryVLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_batteryALabel) lv_obj_add_flag(ui_batteryALabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_startBatteryLabel) lv_obj_add_flag(ui_startBatteryLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_aeIconBatteryScreen1) lv_obj_add_flag(ui_aeIconBatteryScreen1, LV_OBJ_FLAG_HIDDEN);
+    if(ui_Image1) lv_obj_add_flag(ui_Image1, LV_OBJ_FLAG_HIDDEN);
+    if(ui_SOCLabel) lv_obj_add_flag(ui_SOCLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_BarDayLabel) lv_obj_add_flag(ui_BarDayLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_BarDayBottomLabel) lv_obj_add_flag(ui_BarDayBottomLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_BarWeekLabel) lv_obj_add_flag(ui_BarWeekLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_BarWeekBottomLabel) lv_obj_add_flag(ui_BarWeekBottomLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_BatteryTime) lv_obj_add_flag(ui_BatteryTime, LV_OBJ_FLAG_HIDDEN);
+    if(ui_aeLandingBottomLabel) lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_feedbackLabel) lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
+    if(ui_aeLandingIcon) lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+    
+    if(ui_batteryCentralLabel) {
+        lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(ui_batteryCentralLabel, "Updating...");
+        lv_obj_set_style_text_color(ui_batteryCentralLabel, lv_color_hex(0xFF0000), 0);
+    }
+    
+    // Force redraw immediately
+    lv_refr_now(NULL);
+    // Render loop cycle
+    lv_timer_handler();
+}
 void toggle_error_view(bool show_error) {
     if (!ui_batteryScreen) return;
     
@@ -2315,11 +2352,8 @@ void Task_main(void *pvParameters)
         Serial.println("[OTA] Processing Indirect OTA Trigger...");
         
         // Show update message and Pause UI
-        if(ui_batteryCentralLabel) {
-            lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
-            lv_label_set_text(ui_batteryCentralLabel, "Updating...");
-            lv_timer_handler(); // Render one last frame
-        }
+        enter_ota_ui_mode();
+        vTaskDelay(200); // Allow frame buffer to flush completely to display
         g_pauseUI = true;
         
         // 1. Stop ESP-NOW and BLE for WiFi stability & RAM
