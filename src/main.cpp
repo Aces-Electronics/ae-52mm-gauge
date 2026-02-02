@@ -171,10 +171,13 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 
 // Helper to enter clean OTA state
 void enter_ota_ui_mode() {
-    if (!ui_batteryScreen) return;
+    // 1. Force Switch to Battery Screen (where the label lives)
+    if (ui_batteryScreen && lv_scr_act() != ui_batteryScreen) {
+        lv_scr_load(ui_batteryScreen);
+        lv_timer_handler(); // Process the switch
+    }
     
-    // Switch to battery screen if not there logic? 
-    // Assuming we are on it or user can see it.
+    if (!ui_batteryScreen) return; // Should be loaded now
     
     // Hide everything
     if(ui_SBattVArc) lv_obj_add_flag(ui_SBattVArc, LV_OBJ_FLAG_HIDDEN);
@@ -195,12 +198,14 @@ void enter_ota_ui_mode() {
     if(ui_aeLandingBottomLabel) lv_obj_add_flag(ui_aeLandingBottomLabel, LV_OBJ_FLAG_HIDDEN);
     if(ui_feedbackLabel) lv_obj_add_flag(ui_feedbackLabel, LV_OBJ_FLAG_HIDDEN);
     if(ui_aeLandingIcon) lv_obj_add_flag(ui_aeLandingIcon, LV_OBJ_FLAG_HIDDEN);
+    if(ui_meshIndicator) lv_obj_add_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN); // Blinking dot?
     
     if(ui_batteryCentralLabel) {
         lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(ui_batteryCentralLabel); // Ensure it's on top
         lv_label_set_text(ui_batteryCentralLabel, "Updating... OTA\nReboots in ~2m");
         lv_obj_set_style_text_color(ui_batteryCentralLabel, lv_color_hex(0xFF0000), 0);
-        lv_obj_set_style_text_align(ui_batteryCentralLabel, LV_TEXT_ALIGN_CENTER, 0); // Ensure center alignment
+        lv_obj_set_style_text_align(ui_batteryCentralLabel, LV_TEXT_ALIGN_CENTER, 0); 
     }
     
     // Force redraw immediately
