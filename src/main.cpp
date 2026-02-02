@@ -971,6 +971,7 @@ static void set_battery_elements_color(lv_color_t color)
 static void mesh_timer_cb(lv_timer_t *timer)
 {
   (void)timer;
+  if (g_pauseUI) return; // Stop blinking during OTA
   uint32_t now = millis();
   bool shunt_active = (now <= g_shunt_expire_ms);
   bool temp_active = (now <= g_temp_expire_ms);
@@ -1452,7 +1453,7 @@ static void lv_update_shunt_ui_cb(void *user_data)
 
   // --- Start/refresh mesh indicator blinking for MESH_DURATION_MS ---
   g_shunt_expire_ms = millis() + MESH_DURATION_MS;
-  if (ui_meshIndicator)
+  if (ui_meshIndicator && !g_pauseUI)
   {
     // ensure visible so the timer toggles it
     lv_obj_clear_flag(ui_meshIndicator, LV_OBJ_FLAG_HIDDEN);
