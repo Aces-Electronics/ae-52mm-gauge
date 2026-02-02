@@ -2435,8 +2435,6 @@ void Task_main(void *pvParameters)
     bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
     bool tpmsFresh = g_tpmsDataReceived && (now - g_lastTPMSRxTime < 180000); // 3 min threshold
 
-    bool tpmsFresh = g_tpmsDataReceived && (now - g_lastTPMSRxTime < 180000); // 3 min threshold
-
     // 2. Update Enable Flags
     enable_ui_batteryScreen = shuntFresh; 
     enable_ui_temperatureScreen = tempFresh;
