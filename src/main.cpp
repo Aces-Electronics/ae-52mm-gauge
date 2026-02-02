@@ -198,8 +198,9 @@ void enter_ota_ui_mode() {
     
     if(ui_batteryCentralLabel) {
         lv_obj_clear_flag(ui_batteryCentralLabel, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(ui_batteryCentralLabel, "Updating...");
+        lv_label_set_text(ui_batteryCentralLabel, "Updating... OTA\nReboots in ~2m");
         lv_obj_set_style_text_color(ui_batteryCentralLabel, lv_color_hex(0xFF0000), 0);
+        lv_obj_set_style_text_align(ui_batteryCentralLabel, LV_TEXT_ALIGN_CENTER, 0); // Ensure center alignment
     }
     
     // Force redraw immediately
@@ -2353,11 +2354,13 @@ void Task_main(void *pvParameters)
         
         // Show update message and Pause UI
         // OPI Bus Contention Fix: Turn OFF Display to save bandwidth
-        // enter_ota_ui_mode(); 
-        ledcWrite(pwmChannel, 0); // Backlight OFF
-        gfx->displayOff();        // Stop LCD Peripheral
+        enter_ota_ui_mode(); 
+        vTaskDelay(3000); // 1. Show message for 3 seconds so user knows it's happening
+        
+        ledcWrite(pwmChannel, 0); // 2. Backlight OFF
+        gfx->displayOff();        // 3. Stop LCD Peripheral to free bus
         vTaskDelay(200); 
-        g_pauseUI = true;
+        g_pauseUI = true;         // 4. Freeze UI Task
         
         // 1. Stop ESP-NOW and BLE for WiFi stability & RAM
         esp_now_deinit();
