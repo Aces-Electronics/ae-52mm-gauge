@@ -2308,8 +2308,9 @@ void Task_main(void *pvParameters)
         g_indirectOtaPending = false;
         Serial.println("[OTA] Processing Indirect OTA Trigger...");
         
-        // 1. Stop ESP-NOW for WiFi stability
+        // 1. Stop ESP-NOW and BLE for WiFi stability & RAM
         esp_now_deinit();
+        BLEDevice::deinit(true); // Free memory
         WiFi.disconnect(true);
         WiFi.mode(WIFI_STA);
         
@@ -2329,7 +2330,8 @@ void Task_main(void *pvParameters)
             vTaskDelay(2000); // Wait for NTP
             
             WiFiClientSecure client;
-            client.setCACert(OTAGH_CA_CERT);
+            client.setInsecure(); // Save RAM by skipping CA loading
+            // client.setCACert(OTAGH_CA_CERT);
             OTA::init(client);
 
             OTA::UpdateObject obj;
