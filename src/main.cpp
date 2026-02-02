@@ -1604,7 +1604,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     tmp.mesh.name[sizeof(tmp.mesh.name) - 1] = '\0'; // ensure NUL
 
     // Enable Screens
-    enable_ui_batteryScreen = true;
+    // enable_ui_batteryScreen = true; // Managed by Task_main
     
     // Check for configured sensors and valid data
     bool hasPairedSensors = tpmsHandler.anyConfigured();
@@ -1615,7 +1615,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
         }
     }
     
-    enable_ui_tpmsScreen = hasPairedSensors; // Enable screen if user has paired sensors
+    // enable_ui_tpmsScreen = hasPairedSensors; // Managed by Task_main
     if (hasActiveData && hasPairedSensors) g_tpmsDataReceived = true; 
 
     // Extract TPMS Data from Shunt
@@ -1639,7 +1639,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     bool hasValidTemp = (tmp.mesh.tempSensorLastUpdate > 0 && tmp.mesh.tempSensorLastUpdate != 0xFFFFFFFF && tmp.mesh.tempSensorLastUpdate < tempTimeout);
     // Logging removed to prevent stalling
     
-    enable_ui_temperatureScreen = hasValidTemp;
+    // enable_ui_temperatureScreen = hasValidTemp; // Managed by Task_main
     if (hasValidTemp) g_tempDataReceived = true;
 
     if (hasValidTemp) {
@@ -2424,6 +2424,31 @@ void Task_main(void *pvParameters)
 
     // Centralized Timed Rotation Logic
     unsigned long now = millis();
+
+    // --- Freshness & exposure logic ---
+    // 1. Determine Freshness
+    bool shuntFresh = g_shuntDataReceived && (now - g_lastShuntRxTime < DATA_STALENESS_THRESHOLD_MS);
+    bool tempFresh = g_tempDataReceived && (now - g_lastTempRxTime < 30000);
+    bool tpmsFresh = g_tpmsDataReceived && (now - g_lastTPMSRxTime < 180000); // 3 min threshold
+
+    // 2. Update Enable Flags
+    enable_ui_batteryScreen = shuntFresh; 
+    enable_ui_temperatureScreen = tempFresh;
+    enable_ui_tpmsScreen = tpmsFresh && tpmsHandler.anyConfigured(); 
+
+    // 3. Force Exit if Current Screen is Disabled (Stale)
+    if (screen_index == 1 && !enable_ui_batteryScreen) { 
+        Serial.println("Force Exit: Battery Stale");
+        screen_index = 0; screen_change_requested = true; g_isAutoRotating = false; 
+    }
+    if (screen_index == 2 && !enable_ui_temperatureScreen) { 
+        Serial.println("Force Exit: Temp Stale");
+        screen_index = 0; screen_change_requested = true; g_isAutoRotating = false; 
+    }
+    if (screen_index == 3 && !enable_ui_tpmsScreen) { 
+        Serial.println("Force Exit: TPMS Stale");
+        screen_index = 0; screen_change_requested = true; g_isAutoRotating = false; 
+    }
     if (!settingsState && !g_rememberScreen && !g_qrActive && !g_resetPending) {
         // Condition to START auto-rotation: User is on Home Page and Dwell has passed
         if (screen_index == 0) {
