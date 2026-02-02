@@ -1610,8 +1610,23 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
   {
       if (len == sizeof(struct_message_ota_trigger)) {
           memcpy((void*)&g_otaTrigger, incomingData, sizeof(g_otaTrigger));
+          
+          g_otaTrigger.version[sizeof(g_otaTrigger.version)-1] = '\0'; // Safety
+          Serial.printf("[ESP-NOW] RX OTA Trigger: Ver='%s' (Current='%s'), Force=%d\n", 
+                        g_otaTrigger.version, OTA_VERSION, g_otaTrigger.force);
+
+          // Loop Prevention: Check if we are already on this version
+          // If Force is TRUE, we update anyway.
+          if (!g_otaTrigger.force && strcmp(g_otaTrigger.version, OTA_VERSION) == 0) {
+              Serial.println("[ESP-NOW] OTA Ignored: Already on target version.");
+              break; 
+          }
+          
+          if (!g_otaTrigger.force && strcmp(g_otaTrigger.version, OTA_VERSION) == 0) {
+               // Redundant check, but kept for clarity if logic expands
+          }
+
           g_indirectOtaPending = true;
-          Serial.println("[ESP-NOW] Received OTA Trigger!");
       }
       break;
   }
