@@ -2336,6 +2336,8 @@ void Task_main(void *pvParameters)
             configTime(0, 0, "pool.ntp.org", "time.nist.gov");
             vTaskDelay(2000); // Wait for NTP
             
+            Serial.printf("[OTA] Pre-SSL Memory: Heap=%d, PSRAM=%d\n", ESP.getFreeHeap(), ESP.getFreePsram());
+
             WiFiClientSecure client;
             client.setInsecure(); // Save RAM by skipping CA loading
             // client.setCACert(OTAGH_CA_CERT);
