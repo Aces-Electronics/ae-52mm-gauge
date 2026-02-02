@@ -1457,11 +1457,9 @@ static void lv_update_temp_ui_cb(void *user_data)
     struct_message_ae_temp_sensor *p = (struct_message_ae_temp_sensor *)user_data;
     if (!p) return;
 
-    // Unhide UI on first data packet
-    if (!g_tempDataReceived) {
-        g_tempDataReceived = true;
-        setTempUIState(true);
-    }
+    // Unhide UI on data packet (Idempotent)
+    setTempUIState(true);
+    g_tempDataReceived = true;
 
     // Auto-Switch Logic
     bool allowSwitch = !settingsState && !g_rememberScreen;
