@@ -8,7 +8,10 @@ Firmware for the Aces Electronics 52mm OLED Gauge, utilizing LVGL for the UI and
 - **Wireless Pairing**: Securely pairs with the Smart Shunt via ESP-NOW using QR Code exchange.
 - **Error Indication**:
     - **Red Heartbeat**: The Gauge's main UI elements will flash **RED** if the Shunt reports a critical error (Load Off, Over Current, E-Fuse Trip).
-- **OTA Updates**: wireless updates via WiFi.
+- **OTA Updates**: Wireless updates via WiFi with enhanced safety features:
+    - **Safe Mode**: Freezes UI drawing during flash parsing to prevent memory corruption.
+    - **Visual Feedback**: Displays "Updating..." in RED and turns off the screen during the critical write phase.
+    - **Loop Protection**: Rejects updates if the version matches the currently installed firmware.
 
 ## Communication Protocol (ESP-NOW)
 The Gauge listens for a compact **224-byte Mesh Struct** (`struct_message_ae_smart_shunt_mesh`) broadcast by the Smart Shunt. This ensures reliable data delivery within the standard ESP-NOW frame limits while providing real-time updates for:
