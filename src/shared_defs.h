@@ -163,6 +163,13 @@ typedef struct struct_message_ota_trigger {
   bool force; // New Flag
 } __attribute__((packed)) struct_message_ota_trigger;
 
+// Gauge Info Heartbeat (Child to Gateway)
+typedef struct struct_message_gauge_info {
+  int messageID; // 120
+  char fwVersion[12];
+  uint8_t type; // 0=Gen, 1=Gauge
+} __attribute__((packed)) struct_message_gauge_info;
+
 // Backward Compatibility
 typedef struct_message_temp_sensor struct_message_ae_temp_sensor;
 

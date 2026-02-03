@@ -2253,6 +2253,34 @@ static void update_feedback_label_cb(void * data) {
     lv_label_set_text(ui_feedbackLabel, text);
 }
 
+// Heartbeat Logic
+unsigned long g_lastHeartbeat = 0;
+const unsigned long HEARTBEAT_INTERVAL = 60000;
+
+void sendHeartbeat() {
+    if (!g_isPaired) return;
+
+    struct_message_gauge_info msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.messageID = 120;
+    msg.type = 1; // Gauge
+    
+    // OTA_VERSION is defined by build flags. If not, fallback to "0.0.0"
+    #ifdef OTA_VERSION
+    // Use stringify macro trick if needed, or assume string literal
+    strncpy(msg.fwVersion, OTA_VERSION, sizeof(msg.fwVersion) - 1);
+    #else
+    strncpy(msg.fwVersion, "0.0.0", sizeof(msg.fwVersion) - 1);
+    #endif
+
+    esp_err_t res = esp_now_send(g_pairedMac, (uint8_t *)&msg, sizeof(msg));
+    if (res == ESP_OK) {
+        Serial.println("[ESP-NOW] Heartbeat sent.");
+    } else {
+        Serial.printf("[ESP-NOW] Heartbeat failed: %d\n", res);
+    }
+}
+
 void Task_main(void *pvParameters)
 {
   Serial.println("Task_main: Started.");
@@ -2643,6 +2671,12 @@ void Task_main(void *pvParameters)
     
     if (loopCounter % 100 == 0) {
         // Serial.printf("Task_main: Heartbeat (Loop %d)\n", loopCounter);
+    }
+
+    // Gauge Heartbeat (Every 60s) to report version to Shunt
+    if (millis() - g_lastHeartbeat > HEARTBEAT_INTERVAL) {
+        g_lastHeartbeat = millis();
+        sendHeartbeat();
     }
   }
 }
