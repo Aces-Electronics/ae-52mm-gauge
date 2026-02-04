@@ -1,0 +1,36 @@
+name: "Feature request"
+description: "Request a feature or improvement."
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the use-case and how we'll know it's done.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: "Vehicle type, typical trip length, install environment (dust/heat/beach/etc)."
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      placeholder: "What should be true when this is solved?"
+    validations:
+      required: true

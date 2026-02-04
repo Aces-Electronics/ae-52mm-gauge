@@ -1,0 +1,49 @@
+name: "Bug report"
+description: "Report a bug."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks — please include enough detail to reproduce.
+
+  - type: input
+    id: device
+    attributes:
+      label: Device MAC/ID (if applicable)
+      placeholder: "AA:BB:CC:DD:EE:FF"
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware version + channel (if applicable)
+      placeholder: "1.2.3 (stable)"
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots/logs/timestamps
+      description: "Include screenshots + approximate timestamp/timezone."
